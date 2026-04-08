@@ -1,8 +1,19 @@
 <template>
-  <div class="leaderboard-page h-full overflow-y-auto sm:mx-4 sm:rounded-t-[2rem] sm:border-t sm:border-x sm:border-border-subtle sm:shadow-lg">
+  <div class="leaderboard-page workspace-page workspace-scroll h-full">
 
-    <div class="leaderboard-shell relative z-10 mx-auto max-w-[1080px] px-4 pb-10 pt-4 sm:px-8 lg:px-10">
-      <section class="leaderboard-stage">
+    <div class="leaderboard-shell workspace-stack relative z-10">
+      <header class="workspace-titlebar leaderboard-titlebar">
+        <div class="workspace-titlecopy">
+          <h1 class="workspace-title">排行榜</h1>
+          <p class="workspace-subtitle">做题成长与游戏记录使用同一套节奏呈现，切换模块时保持连续体验。</p>
+        </div>
+        <div class="leaderboard-titlebar__meta">
+          <span class="workspace-chip px-3 py-1">Top 10</span>
+          <span class="workspace-chip px-3 py-1">实时同步</span>
+        </div>
+      </header>
+
+      <section class="leaderboard-stage workspace-section">
         <div class="leaderboard-stage__glow leaderboard-stage__glow--a"></div>
         <div class="leaderboard-stage__glow leaderboard-stage__glow--b"></div>
 
@@ -67,7 +78,7 @@
               v-for="tab in tabs"
               :key="tab.val"
               type="button"
-              class="leaderboard-tab"
+            class="leaderboard-tab workspace-chip"
               :class="activeTab === tab.val ? 'is-active' : ''"
               @click="activeTab = tab.val"
             >
@@ -99,7 +110,7 @@
         </div>
       </section>
 
-      <section class="leaderboard-list-section">
+      <section class="leaderboard-list-section workspace-panel p-4 sm:p-5">
         <div class="leaderboard-list-head">
           <div>
             <p class="leaderboard-list-head__kicker">Top {{ currentList.length || 0 }}</p>
@@ -112,7 +123,7 @@
           <div
             v-for="(item, idx) in currentList"
             :key="item.userId || item.username || `${item.displayName}-${idx}`"
-            class="rank-card group"
+            class="rank-card workspace-list-item group"
             :class="[
               item.isMe ? 'rank-card-me' : '',
               idx < 3 ? 'rank-card-top' : ''
@@ -154,13 +165,13 @@
             </div>
           </div>
 
-          <div v-if="loading" class="leaderboard-state">
+          <div v-if="loading" class="leaderboard-state workspace-empty">
             <p class="leaderboard-state__emoji">⏳</p>
             <p class="leaderboard-state__title">榜单更新中</p>
             <p class="leaderboard-state__desc">正在同步最新成绩，请稍候片刻。</p>
           </div>
 
-          <div v-else-if="!currentList.length" class="leaderboard-state">
+          <div v-else-if="!currentList.length" class="leaderboard-state workspace-empty">
             <p class="leaderboard-state__emoji">🌫️</p>
             <p class="leaderboard-state__title">{{ currentTabMeta.emptyTitle }}</p>
             <p class="leaderboard-state__desc">{{ currentTabMeta.emptyDesc }}</p>
@@ -346,10 +357,22 @@ onMounted(() => {
   background: var(--app-shell-bg);
 }
 
+.leaderboard-shell {
+  display: flex;
+  flex-direction: column;
+}
+
+.leaderboard-titlebar__meta {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
 .leaderboard-page__glow {
   position: absolute;
   border-radius: 999px;
-  filter: blur(140px);
+  filter: blur(56px);
 }
 
 .leaderboard-page__glow--a {
@@ -379,19 +402,19 @@ onMounted(() => {
 .leaderboard-stage {
   position: relative;
   overflow: hidden;
-  border-radius: 34px;
+  border-radius: var(--radius-xl);
   border: 1px solid var(--border-soft);
   background:
     linear-gradient(180deg, rgba(255, 255, 255, 0.18), rgba(255, 255, 255, 0.04)),
     linear-gradient(180deg, var(--bg-elevated), var(--bg-card));
-  box-shadow: var(--shadow-float);
-  backdrop-filter: blur(18px);
+  box-shadow: var(--shadow-hover);
+  backdrop-filter: blur(8px);
 }
 
 .leaderboard-stage__glow {
   position: absolute;
   border-radius: 999px;
-  filter: blur(90px);
+  filter: blur(38px);
   pointer-events: none;
 }
 
@@ -615,7 +638,7 @@ onMounted(() => {
   align-items: center;
   gap: 8px;
   padding: 6px;
-  border-radius: 22px;
+  border-radius: var(--radius-lg);
   border: 1px solid var(--border-soft);
   background: var(--bg-soft);
 }
@@ -627,7 +650,9 @@ onMounted(() => {
   gap: 8px;
   min-height: 44px;
   padding: 0 18px;
-  border-radius: 18px;
+  border-radius: var(--radius-md);
+  border: none;
+  background: transparent;
   color: var(--text-secondary);
   font-size: 14px;
   font-weight: 700;
@@ -666,7 +691,7 @@ onMounted(() => {
 }
 
 .leaderboard-list-section {
-  margin-top: 26px;
+  margin-top: var(--space-5);
 }
 
 .leaderboard-list-head {
@@ -675,7 +700,8 @@ onMounted(() => {
   justify-content: space-between;
   gap: 18px;
   margin-bottom: 18px;
-  padding: 0 4px;
+  padding: 0 6px 14px;
+  border-bottom: 1px solid var(--border-soft);
 }
 
 .leaderboard-list-head__kicker {
@@ -711,7 +737,7 @@ onMounted(() => {
   gap: 18px;
   padding: 18px 22px;
   overflow: hidden;
-  border-radius: 28px;
+  border-radius: var(--radius-lg);
   border: 1px solid var(--border-soft);
   background:
     linear-gradient(180deg, rgba(255, 255, 255, 0.18), rgba(255, 255, 255, 0.02)),
@@ -891,7 +917,7 @@ onMounted(() => {
 
 .leaderboard-state {
   padding: 54px 20px;
-  border-radius: 28px;
+  border-radius: var(--radius-lg);
   border: 1px dashed var(--border-soft);
   background:
     linear-gradient(180deg, rgba(255, 255, 255, 0.1), rgba(255, 255, 255, 0.02)),
@@ -974,8 +1000,12 @@ onMounted(() => {
     padding-bottom: 28px;
   }
 
+  .leaderboard-titlebar__meta {
+    width: 100%;
+  }
+
   .leaderboard-stage {
-    border-radius: 28px;
+    border-radius: var(--radius-lg);
   }
 
   .leaderboard-stage__inner {

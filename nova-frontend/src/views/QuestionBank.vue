@@ -1,5 +1,5 @@
 <template>
-  <div class="question-bank-shell h-full flex flex-col md:flex-row overflow-hidden sm:mx-4 sm:rounded-t-[2rem] sm:border-t sm:border-x sm:border-border-subtle sm:shadow-lg">
+  <div class="question-bank-shell workspace-shell h-full flex flex-col md:flex-row overflow-hidden sm:mx-4">
     <div class="md:hidden px-3 pt-3 pb-2 border-b border-border-subtle bg-bg-surface/80 backdrop-blur">
       <div class="grid grid-cols-2 gap-2 rounded-xl bg-black/[0.03] p-1">
         <button
@@ -20,7 +20,7 @@
     </div>
 
     <aside
-      class="w-full md:w-[460px] xl:w-[500px] border-b md:border-b-0 md:border-r border-border-subtle bg-bg-surface backdrop-blur-xl flex-col"
+      class="w-full md:w-[430px] xl:w-[460px] border-b md:border-b-0 md:border-r border-border-subtle bg-bg-surface backdrop-blur-xl flex-col"
       :class="mobileTab === 'detail' ? 'hidden md:flex' : 'flex'"
     >
       <div class="px-4 py-4 border-b border-border-subtle">
@@ -30,7 +30,7 @@
             <p class="text-sm text-text-secondary mt-1">官方题库 + 自定义导入题库 + AI 深度解析</p>
           </div>
           <button
-            class="shrink-0 inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold border transition-colors"
+            class="workspace-btn shrink-0 inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold border transition-colors"
             :class="authStore.isGuest
               ? 'border-black/10 bg-black/[0.03] text-text-tertiary cursor-not-allowed'
               : 'border-ai-from/20 bg-ai-from/10 text-ai-from hover:bg-ai-from/15'"
@@ -49,7 +49,7 @@
             <input
               v-model="searchQuery"
               type="text"
-              class="w-full pl-9 pr-3 py-2 rounded-xl border border-border-subtle bg-bg-elevated text-sm focus:outline-none focus:ring-2 focus:ring-ai-from/25"
+              class="workspace-control w-full pl-9 pr-3 py-2 rounded-xl border border-border-subtle bg-bg-elevated text-sm focus:outline-none focus:ring-2 focus:ring-ai-from/25"
               placeholder="搜索题目..."
               @keyup.enter="handleSearch"
             />
@@ -58,7 +58,7 @@
             </svg>
           </div>
           <button
-            class="px-3 py-2 rounded-xl text-sm border border-border-subtle bg-bg-surface hover:bg-bg-elevated text-text-primary"
+            class="workspace-btn workspace-btn-muted px-3 py-2 rounded-xl text-sm border border-border-subtle bg-bg-surface hover:bg-bg-elevated text-text-primary"
             @click="handleSearch"
           >
             搜索
@@ -68,7 +68,7 @@
         <div class="mt-2 grid grid-cols-3 gap-2">
           <select
             v-model="difficultyFilter"
-            class="w-full rounded-xl border border-border-subtle bg-bg-surface px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-ai-from/25"
+            class="workspace-control w-full rounded-xl border border-border-subtle bg-bg-surface px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-ai-from/25"
           >
             <option value="all">全部难度</option>
             <option value="1">简单</option>
@@ -77,7 +77,7 @@
           </select>
           <select
             v-model="currentCategory"
-            class="w-full rounded-xl border border-border-subtle bg-bg-surface px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-ai-from/25"
+            class="workspace-control w-full rounded-xl border border-border-subtle bg-bg-surface px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-ai-from/25"
           >
             <option
               v-for="cat in categories"
@@ -88,7 +88,7 @@
             </option>
           </select>
           <button
-            class="w-full rounded-xl px-3 py-2 text-sm font-semibold text-white bg-gradient-to-r from-ai-from to-ai-to hover:opacity-95 disabled:opacity-55"
+            class="workspace-btn workspace-btn-primary w-full rounded-xl px-3 py-2 text-sm font-semibold text-white bg-gradient-to-r from-ai-from to-ai-to hover:opacity-95 disabled:opacity-55"
             @click="drawRandomQuestion"
             :disabled="randomLoading || !isCurrentBankReady"
           >
@@ -105,7 +105,7 @@
             <div class="flex items-center gap-2">
               <button
                 type="button"
-                class="text-[11px] px-2.5 py-1 rounded-lg border border-border-subtle bg-bg-surface text-text-secondary hover:bg-bg-elevated"
+                class="workspace-btn workspace-btn-muted text-[11px] px-2.5 py-1 rounded-lg border border-border-subtle bg-bg-surface text-text-secondary hover:bg-bg-elevated"
                 @click="bankPanelCollapsed = !bankPanelCollapsed"
               >
                 {{ bankPanelCollapsed ? '展开题库区' : '收起题库区' }}
@@ -211,7 +211,7 @@
         </div>
       </div>
 
-      <div class="flex-1 overflow-y-auto p-3 custom-scrollbar">
+      <div class="flex-1 overflow-y-auto px-2 py-2 custom-scrollbar">
         <div class="mb-2 flex items-center justify-between px-1 text-[11px] text-text-tertiary">
           <span>共 {{ totalQuestions }} 题 · 当前 10 题/页</span>
           <span v-if="questions.length > 0 && totalQuestions > questions.length">可翻页查看更多</span>
@@ -224,7 +224,7 @@
           </div>
         </div>
 
-        <div v-else-if="questions.length === 0" class="h-full flex items-center justify-center text-sm text-text-tertiary text-center px-4 leading-6">
+        <div v-else-if="questions.length === 0" class="workspace-empty h-full flex items-center justify-center text-sm text-text-tertiary text-center px-4 leading-6">
           {{ listEmptyTip }}
         </div>
 
@@ -232,10 +232,10 @@
           <button
             v-for="q in questions"
             :key="q.id"
-            class="w-full text-left rounded-xl border p-3 transition-all"
+            class="workspace-list-item w-full text-left rounded-2xl border p-3 transition-all"
             :class="activeQuestion?.id === q.id
-              ? 'border-ai-from/35 bg-ai-from/8 shadow-sm'
-              : 'border-border-subtle bg-bg-surface hover:bg-black/[0.02] dark:hover:bg-white/[0.02]'"
+              ? 'workspace-list-item-active border-ai-from/35 bg-ai-from/8 shadow-[0_14px_28px_-20px_rgba(99,102,241,0.55)]'
+              : 'border-black/8 bg-white/80 hover:bg-white hover:border-black/14'"
             @click="openQuestion(q)"
           >
             <div class="flex items-center gap-2 flex-wrap">
@@ -253,7 +253,7 @@
                 自定义
               </span>
             </div>
-            <h3 class="question-title mt-2 font-semibold text-text-primary">{{ q.title }}</h3>
+            <h3 class="question-title mt-2 font-semibold text-text-primary" :class="{ 'text-indigo-600': activeQuestion?.id === q.id }">{{ q.title }}</h3>
             <div class="mt-2 flex items-center gap-2 text-[11px] text-text-tertiary flex-wrap">
               <span>{{ categoryLabel(q.category) }}</span>
               <span>·</span>
@@ -267,7 +267,7 @@
 
         <div v-if="!loading && totalPages > 1" class="mt-4 flex items-center justify-center gap-2 text-xs">
           <button
-            class="px-2.5 py-1 rounded border border-border-subtle bg-bg-surface disabled:opacity-40"
+            class="workspace-btn workspace-btn-muted px-2.5 py-1 rounded border border-border-subtle bg-bg-surface disabled:opacity-40"
             :disabled="currentPage <= 1"
             @click="changePage(currentPage - 1)"
           >
@@ -275,7 +275,7 @@
           </button>
           <span class="text-text-tertiary">{{ currentPage }} / {{ totalPages }}</span>
           <button
-            class="px-2.5 py-1 rounded border border-border-subtle bg-bg-surface text-text-primary disabled:opacity-40"
+            class="workspace-btn workspace-btn-muted px-2.5 py-1 rounded border border-border-subtle bg-bg-surface text-text-primary disabled:opacity-40"
             :disabled="currentPage >= totalPages"
             @click="changePage(currentPage + 1)"
           >
@@ -302,16 +302,20 @@
           </p>
         </div>
 
-        <div v-else class="text-center">
-          <div class="text-5xl mb-4 opacity-25">📚</div>
-          <p>请先从左侧选择题目，或点击 AI 抽题</p>
+        <div v-else class="text-center px-6">
+          <div class="w-24 h-24 rounded-2xl bg-white/80 border border-black/8 shadow-sm mx-auto mb-4 grid place-items-center">
+            <svg class="w-11 h-11 opacity-35" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4 6h16M4 12h16M4 18h10" />
+            </svg>
+          </div>
+          <p class="text-xl font-semibold text-slate-700">请先从左侧选择题目，或点击 AI 抽题</p>
         </div>
       </div>
 
-      <div v-else class="px-6 md:px-10 py-7 max-w-5xl mx-auto">
+      <div v-else class="px-5 md:px-8 xl:px-10 py-7 max-w-[1020px] mx-auto">
         <div class="flex items-center flex-wrap gap-2">
           <button
-            class="md:hidden text-xs px-2.5 py-1 rounded-lg border border-black/10 bg-white text-text-secondary"
+            class="workspace-btn workspace-btn-muted md:hidden text-xs px-2.5 py-1 rounded-lg border border-black/10 bg-white text-text-secondary"
             @click="mobileTab = 'list'"
           >
             返回列表
@@ -322,7 +326,7 @@
             {{ currentBank ? currentBank.name : '官方题库' }}
           </span>
           <button
-            class="ml-auto text-xs px-3 py-1.5 rounded-lg border transition-colors"
+            class="workspace-btn ml-auto text-xs px-3 py-1.5 rounded-lg border transition-colors"
             :class="isDoneQuestion(activeQuestion.id)
               ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
               : 'border-ai-from/35 bg-ai-from/8 text-ai-from hover:bg-ai-from/14'"
@@ -334,18 +338,18 @@
 
         <h1 class="mt-4 text-2xl font-bold text-text-primary leading-tight">{{ activeQuestion.title }}</h1>
 
-        <article class="mt-5 rounded-2xl border border-border-subtle bg-bg-elevated backdrop-blur-xl p-6 shadow-sm">
+        <article class="mt-5 rounded-3xl border border-border-subtle bg-bg-elevated backdrop-blur-xl p-6 shadow-sm">
           <div class="text-sm font-semibold text-text-primary mb-3">题目内容</div>
           <div class="prose prose-sm max-w-none text-text-secondary">
             <TypeWriter :text="activeQuestion.content || '暂无题目内容'" :renderMarkdown="true" :isTyping="false" />
           </div>
         </article>
 
-        <article class="mt-4 rounded-2xl border border-border-subtle bg-bg-elevated backdrop-blur-xl p-6 shadow-sm">
+        <article class="mt-4 rounded-3xl border border-border-subtle bg-bg-elevated backdrop-blur-xl p-6 shadow-sm">
           <div class="flex items-center gap-3 mb-3 flex-wrap">
             <div class="text-sm font-semibold text-text-primary">参考答案</div>
             <button
-              class="text-xs px-2.5 py-1 rounded-lg border border-black/10 bg-white hover:bg-black/[0.03]"
+              class="workspace-btn workspace-btn-muted text-xs px-2.5 py-1 rounded-lg border border-black/10 bg-white hover:bg-black/[0.03]"
               @click="loadDbAnswer(activeQuestion.id)"
               :disabled="dbAnswerLoading"
             >
@@ -363,14 +367,14 @@
 
         <div class="mt-4">
           <button
-            class="px-4 py-2 rounded-xl text-sm font-semibold text-white bg-gradient-to-r from-ai-from to-ai-to shadow-md hover:opacity-95"
+            class="workspace-btn workspace-btn-primary px-4 py-2 rounded-xl text-sm font-semibold text-white bg-gradient-to-r from-ai-from to-ai-to shadow-md hover:opacity-95"
             @click="startAiExplanation"
           >
             AI 深度解析
           </button>
         </div>
 
-        <article v-if="aiStarted" class="mt-4 rounded-2xl border border-black/8 bg-white/84 backdrop-blur-xl p-6 shadow-sm">
+        <article v-if="aiStarted" class="mt-4 rounded-3xl border border-black/8 bg-white/84 backdrop-blur-xl p-6 shadow-sm">
           <div class="text-sm font-semibold text-text-primary mb-3">AI 回答</div>
           <div class="prose prose-sm max-w-none text-text-secondary">
             <TypeWriter :text="aiContent || ''" :renderMarkdown="true" :isTyping="aiStreaming" />
@@ -403,7 +407,7 @@
             <input
               v-model.trim="uploadForm.name"
               type="text"
-              class="mt-1.5 w-full rounded-xl border border-black/10 bg-white px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-ai-from/25"
+              class="workspace-control mt-1.5 w-full rounded-xl border border-black/10 bg-white px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-ai-from/25"
               placeholder="不填则默认使用文件名"
             />
           </label>
@@ -413,7 +417,7 @@
               <span class="text-xs text-text-tertiary">分类</span>
               <select
                 v-model="uploadForm.category"
-                class="mt-1.5 w-full rounded-xl border border-black/10 bg-white px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-ai-from/25"
+                class="workspace-control mt-1.5 w-full rounded-xl border border-black/10 bg-white px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-ai-from/25"
               >
                 <option v-for="cat in categories.filter((item) => item.id !== 'all')" :key="cat.id" :value="cat.id">
                   {{ cat.name }}
@@ -424,7 +428,7 @@
               <span class="text-xs text-text-tertiary">默认难度</span>
               <select
                 v-model.number="uploadForm.difficulty"
-                class="mt-1.5 w-full rounded-xl border border-black/10 bg-white px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-ai-from/25"
+                class="workspace-control mt-1.5 w-full rounded-xl border border-black/10 bg-white px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-ai-from/25"
               >
                 <option :value="1">简单</option>
                 <option :value="2">中等</option>
@@ -440,7 +444,7 @@
                 ref="uploadInput"
                 type="file"
                 accept=".txt,text/plain"
-                class="block w-full text-sm text-text-secondary file:mr-3 file:rounded-lg file:border-0 file:bg-ai-from/10 file:px-3 file:py-2 file:text-xs file:font-semibold file:text-ai-from hover:file:bg-ai-from/15"
+                class="workspace-control block w-full text-sm text-text-secondary file:mr-3 file:rounded-lg file:border-0 file:bg-ai-from/10 file:px-3 file:py-2 file:text-xs file:font-semibold file:text-ai-from hover:file:bg-ai-from/15"
                 @change="handleUploadFileChange"
               />
               <p class="mt-2 text-[11px] text-text-tertiary">
@@ -453,7 +457,7 @@
             <div class="flex items-center justify-between gap-3">
               <p class="text-xs font-semibold text-text-primary">格式要求（严格）</p>
               <button
-                class="text-[11px] px-2 py-1 rounded-lg border border-black/10 bg-white hover:bg-black/[0.03]"
+                class="workspace-btn workspace-btn-muted text-[11px] px-2 py-1 rounded-lg border border-black/10 bg-white hover:bg-black/[0.03]"
                 @click="downloadTxtTemplate"
               >
                 下载模板
@@ -471,11 +475,11 @@
         </div>
 
         <div class="mt-6 flex justify-end gap-2">
-          <button class="px-3 py-2 rounded-xl border border-black/10 text-sm hover:bg-black/[0.03]" @click="closeImportDialog">
+          <button class="workspace-btn workspace-btn-muted px-3 py-2 rounded-xl border border-black/10 text-sm hover:bg-black/[0.03]" @click="closeImportDialog">
             取消
           </button>
           <button
-            class="px-3 py-2 rounded-xl text-sm font-semibold text-white bg-gradient-to-r from-ai-from to-ai-to disabled:opacity-60"
+            class="workspace-btn workspace-btn-primary px-3 py-2 rounded-xl text-sm font-semibold text-white bg-gradient-to-r from-ai-from to-ai-to disabled:opacity-60"
             :disabled="uploadingBank"
             @click="submitImport"
           >
@@ -504,17 +508,17 @@
           <input
             v-model.trim="renameForm.name"
             type="text"
-            class="mt-1.5 w-full rounded-xl border border-black/10 bg-white px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-ai-from/25"
+            class="workspace-control mt-1.5 w-full rounded-xl border border-black/10 bg-white px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-ai-from/25"
             placeholder="请输入新的题库名称"
           />
         </label>
 
         <div class="mt-6 flex justify-end gap-2">
-          <button class="px-3 py-2 rounded-xl border border-black/10 text-sm hover:bg-black/[0.03]" @click="closeRenameDialog">
+          <button class="workspace-btn workspace-btn-muted px-3 py-2 rounded-xl border border-black/10 text-sm hover:bg-black/[0.03]" @click="closeRenameDialog">
             取消
           </button>
           <button
-            class="px-3 py-2 rounded-xl text-sm font-semibold text-white bg-gradient-to-r from-ai-from to-ai-to disabled:opacity-60"
+            class="workspace-btn workspace-btn-primary px-3 py-2 rounded-xl text-sm font-semibold text-white bg-gradient-to-r from-ai-from to-ai-to disabled:opacity-60"
             :disabled="renamingBank"
             @click="submitRename"
           >
@@ -536,14 +540,14 @@
         </p>
         <div class="mt-6 flex justify-end gap-2">
           <button
-            class="px-3 py-2 rounded-xl border border-black/10 text-sm hover:bg-black/[0.03]"
+            class="workspace-btn workspace-btn-muted px-3 py-2 rounded-xl border border-black/10 text-sm hover:bg-black/[0.03]"
             :disabled="doneConfirmLoading"
             @click="closeDoneConfirmDialog"
           >
             再看看
           </button>
           <button
-            class="px-4 py-2 rounded-xl text-sm font-semibold text-white bg-gradient-to-r from-ai-from to-ai-to disabled:opacity-60"
+            class="workspace-btn workspace-btn-primary px-4 py-2 rounded-xl text-sm font-semibold text-white bg-gradient-to-r from-ai-from to-ai-to disabled:opacity-60"
             :disabled="doneConfirmLoading"
             @click="confirmMarkQuestionDone"
           >
@@ -929,6 +933,8 @@ const fetchQuestions = async (page = currentPage.value) => {
       questions.value = []
       totalPages.value = 1
       totalQuestions.value = 0
+      activeQuestion.value = null
+      clearAnswerPanels()
       return
     }
 
@@ -940,10 +946,13 @@ const fetchQuestions = async (page = currentPage.value) => {
     currentPage.value = page
     totalPages.value = Math.max(1, Number(res.data?.pages || 1))
     totalQuestions.value = Math.max(0, Number(res.data?.total || 0))
+    syncActiveQuestionAfterListLoaded()
   } catch (_) {
     questions.value = []
     totalPages.value = 1
     totalQuestions.value = 0
+    activeQuestion.value = null
+    clearAnswerPanels()
   } finally {
     loading.value = false
   }
@@ -973,29 +982,72 @@ const selectBank = (bank) => {
 
 let latestAnswerRequestId = 0
 
+const hydrateQuestionDetail = async (questionId, fallbackQuestion = null) => {
+  const qid = Number(questionId || 0)
+  if (!Number.isInteger(qid) || qid <= 0) {
+    activeQuestion.value = fallbackQuestion || null
+    return
+  }
+  try {
+    const res = await api.get(`/api/questions/${qid}?_t=${Date.now()}`, { cache: 'no-store' })
+    if (res.code === 200 && res.data) {
+      const latestListQuestion = questions.value.find((item) => Number(item?.id || 0) === qid)
+      const mergedViewCount = Math.max(
+        Number(res.data.viewCount || 0),
+        Number(latestListQuestion?.viewCount || 0),
+        Number(fallbackQuestion?.viewCount || 0),
+        Number(activeQuestion.value?.id || 0) === qid ? Number(activeQuestion.value?.viewCount || 0) : 0,
+      )
+      activeQuestion.value = {
+        ...res.data,
+        tags: typeof res.data.tags === 'string' ? res.data.tags.split(',').map((t) => t.trim()).filter(Boolean) : [],
+        viewCount: Number.isFinite(mergedViewCount) ? mergedViewCount : Number(res.data.viewCount || 0),
+      }
+      return
+    }
+  } catch (_) {
+    // fall back to list payload
+  }
+  const latestListQuestion = questions.value.find((item) => Number(item?.id || 0) === qid)
+  activeQuestion.value = latestListQuestion || fallbackQuestion || null
+}
+
+const syncActiveQuestionAfterListLoaded = () => {
+  if (!questions.value.length) {
+    activeQuestion.value = null
+    clearAnswerPanels()
+    return
+  }
+
+  const activeId = Number(activeQuestion.value?.id || 0)
+  const matched = questions.value.find((item) => Number(item?.id || 0) === activeId)
+  if (matched) {
+    activeQuestion.value = {
+      ...matched,
+      ...activeQuestion.value,
+      id: matched.id,
+      category: matched.category,
+      tags: matched.tags,
+    }
+    return
+  }
+
+  const firstQuestion = questions.value[0]
+  activeQuestion.value = firstQuestion
+  clearAnswerPanels()
+  const firstQuestionId = Number(firstQuestion?.id || 0)
+  if (firstQuestionId > 0) {
+    void hydrateQuestionDetail(firstQuestionId, firstQuestion)
+    void loadDbAnswer(firstQuestionId, { preserveExisting: false })
+  }
+}
+
 const openQuestion = async (question) => {
   const qid = Number(question?.id || 0)
   const isSameQuestion = qid > 0 && Number(activeQuestion.value?.id || 0) === qid
   if (isSameQuestion) {
     // Align with Notes module: clicking the already selected item does not increase view count.
-    try {
-      const res = await api.get(`/api/questions/${qid}?_t=${Date.now()}`, { cache: 'no-store' })
-      if (res.code === 200 && res.data) {
-        const latestListQuestion = questions.value.find((item) => Number(item?.id || 0) === qid)
-        const mergedViewCount = Math.max(
-          Number(res.data.viewCount || 0),
-          Number(latestListQuestion?.viewCount || 0),
-          Number(activeQuestion.value?.viewCount || 0),
-        )
-        activeQuestion.value = {
-          ...res.data,
-          tags: typeof res.data.tags === 'string' ? res.data.tags.split(',').map((t) => t.trim()).filter(Boolean) : [],
-          viewCount: Number.isFinite(mergedViewCount) ? mergedViewCount : Number(res.data.viewCount || 0),
-        }
-      }
-    } catch (_) {
-      // keep current detail panel
-    }
+    await hydrateQuestionDetail(qid, question)
     if (!dbAnswer.value && !dbAnswerLoading.value) {
       loadDbAnswer(qid, { preserveExisting: true })
     }
@@ -1014,27 +1066,7 @@ const openQuestion = async (question) => {
 
   clearAnswerPanels()
   await markQuestionViewed(qid)
-  try {
-    const res = await api.get(`/api/questions/${qid}?_t=${Date.now()}`, { cache: 'no-store' })
-    if (res.code === 200 && res.data) {
-      const latestListQuestion = questions.value.find((item) => Number(item?.id || 0) === qid)
-      const mergedViewCount = Math.max(
-        Number(res.data.viewCount || 0),
-        Number(latestListQuestion?.viewCount || 0),
-      )
-      activeQuestion.value = {
-        ...res.data,
-        tags: typeof res.data.tags === 'string' ? res.data.tags.split(',').map((t) => t.trim()).filter(Boolean) : [],
-        viewCount: Number.isFinite(mergedViewCount) ? mergedViewCount : Number(res.data.viewCount || 0),
-      }
-    } else {
-      const latestListQuestion = questions.value.find((item) => Number(item?.id || 0) === qid)
-      activeQuestion.value = latestListQuestion || question
-    }
-  } catch (_) {
-    const latestListQuestion = questions.value.find((item) => Number(item?.id || 0) === qid)
-    activeQuestion.value = latestListQuestion || question
-  }
+  await hydrateQuestionDetail(qid, question)
   if (window.innerWidth < 768) {
     mobileTab.value = 'detail'
   }

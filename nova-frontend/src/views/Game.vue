@@ -1,7 +1,7 @@
 <template>
-  <div class="game-root h-full flex items-start sm:items-center justify-center px-3 py-3 sm:px-6 sm:py-5 sm:mx-4 sm:rounded-t-[2rem] sm:border-t sm:border-x sm:border-border-subtle sm:shadow-lg">
-    <div class="w-full max-w-6xl space-y-3 sm:space-y-4">
-      <div class="forest-panel rounded-2xl bg-white/75 backdrop-blur-md border border-black/5 shadow-sm px-4 py-3 sm:px-5 sm:py-4 flex flex-col md:flex-row md:items-center md:justify-between gap-3 sm:gap-4">
+  <div class="game-root workspace-page workspace-scroll h-full flex items-start sm:items-center justify-center px-3 py-3 sm:px-6 sm:py-5">
+    <div class="workspace-stack w-full space-y-3 sm:space-y-4">
+      <div class="forest-panel workspace-titlebar rounded-2xl bg-bg-surface/60 backdrop-blur-md border border-border-soft shadow-sm px-4 py-3 sm:px-5 sm:py-4 flex flex-col md:flex-row md:items-center md:justify-between gap-3 sm:gap-4">
         <div class="flex items-center gap-3">
           <span class="text-2xl">🎮</span>
           <div>
@@ -23,14 +23,14 @@
         </template>
       </div>
 
-      <div v-if="activeGame === null" class="forest-hall rounded-3xl bg-white/70 backdrop-blur-md border border-black/5 shadow-xl p-5 sm:p-6">
+      <div v-if="activeGame === null" class="forest-hall workspace-shell rounded-3xl bg-bg-surface/50 backdrop-blur-md border border-border-soft shadow-sm p-5 sm:p-6">
         <div class="flex items-center justify-between gap-3 mb-4">
           <h3 class="text-xl font-semibold text-slate-900">游戏大厅</h3>
           <span class="text-xs text-slate-500">持续上新中</span>
         </div>
 
         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <article class="game-card game-card-active">
+          <article class="game-card workspace-panel game-card-active">
             <div class="cover cover-runner" @click="enterGame('cuihua-runner')" role="button" tabindex="0" @keydown.enter="enterGame('cuihua-runner')">
               <div class="cover-badge">热门</div>
               <div class="cover-track"></div>
@@ -47,12 +47,12 @@
               <p class="mt-2 text-sm text-slate-600">森林三赛道跑酷，左右切道规避光头强障碍。</p>
               <div class="mt-3 flex items-center justify-between">
                 <span class="text-xs text-slate-500">历史最高：{{ highScore }}</span>
-                <button @click="enterGame('cuihua-runner')" class="game-enter-btn px-4 py-2 rounded-lg text-white text-sm font-medium shadow hover:opacity-90 transition">进入游戏</button>
+                <button @click="enterGame('cuihua-runner')" class="workspace-btn workspace-btn-primary game-enter-btn px-4 py-2 rounded-lg text-white text-sm font-medium shadow hover:opacity-90 transition">进入游戏</button>
               </div>
             </div>
           </article>
 
-          <article class="game-card game-card-coming">
+          <article class="game-card workspace-panel game-card-coming">
             <div class="cover cover-coming">
               <div class="coming-tag">敬请期待</div>
               <div class="coming-sub">下一款小游戏正在开发中</div>
@@ -63,7 +63,7 @@
                 <span class="text-xs text-slate-500 bg-slate-100 border border-slate-200 rounded-full px-2 py-0.5">未上线</span>
               </div>
               <p class="mt-2 text-sm text-slate-600">更多玩法准备中，后续会在这里解锁。</p>
-              <button class="mt-3 w-full px-4 py-2 rounded-lg border border-slate-200 bg-slate-100 text-slate-400 text-sm cursor-not-allowed" disabled>敬请期待</button>
+              <button class="workspace-btn workspace-btn-muted mt-3 w-full px-4 py-2 rounded-lg border border-slate-200 bg-slate-100 text-slate-400 text-sm cursor-not-allowed" disabled>敬请期待</button>
             </div>
           </article>
         </div>
@@ -71,7 +71,7 @@
 
       <div v-else class="space-y-2.5 sm:space-y-3">
         <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
-          <button @click="goBackToHall" class="inline-flex items-center justify-center sm:justify-start gap-2 px-3 py-2 rounded-lg border border-black/10 bg-white/75 text-sm text-slate-700 hover:bg-white transition"><span>←</span><span>返回游戏大厅</span></button>
+          <button @click="goBackToHall" class="workspace-btn workspace-btn-muted inline-flex items-center justify-center sm:justify-start gap-2 px-3 py-2 rounded-lg border border-border-soft bg-bg-card text-sm text-text-secondary hover:bg-bg-surface transition"><span>←</span><span>返回游戏大厅</span></button>
           <div class="flex items-center justify-center sm:justify-end gap-2 text-xs text-slate-500">
             <span class="game-tip-chip tip-lane">← → 切道</span>
             <span>速度倍率 x{{ speedRate }}</span>
@@ -85,7 +85,7 @@
               <div class="text-6xl mb-4">{{ gameState === 'idle' ? '🚇' : '💥' }}</div>
               <p class="text-2xl sm:text-3xl font-display font-bold tracking-wide">{{ gameState === 'idle' ? '翠花快跑·森林赛道' : '挑战结束，再冲一局' }}</p>
               <p class="mt-3 text-sm text-white/85">森林赛道已开启，左右切道避开光头强障碍。</p>
-              <button @click="startGame" class="game-enter-btn mt-6 px-8 py-3.5 text-white font-bold rounded-xl shadow-lg hover:opacity-90 active:scale-95 transition-all">{{ gameState === 'idle' ? '开始挑战' : '再来一局' }}</button>
+              <button @click="startGame" class="workspace-btn workspace-btn-primary game-enter-btn mt-6 px-8 py-3.5 text-white font-bold rounded-xl shadow-lg hover:opacity-90 active:scale-95 transition-all">{{ gameState === 'idle' ? '开始挑战' : '再来一局' }}</button>
               <p class="mt-4 text-xs text-white/70">操作：A/D 或 ←/→ 切道，移动端左右滑动</p>
             </div>
           </div>
@@ -1198,8 +1198,7 @@ onUnmounted(() => {
 </script>
 <style scoped>
 .game-root {
-  padding-bottom: calc(env(safe-area-inset-bottom) + 10px);
-  background: var(--app-shell-bg);
+  background: transparent;
 }
 
 .game-stage {
@@ -1248,10 +1247,15 @@ onUnmounted(() => {
 .tip-lane { color: #b91c1c; }
 
 .game-card {
-  border-radius: 20px;
   overflow: hidden;
+  border-radius: 24px;
   border: 1px solid var(--border-soft);
-  background: var(--bg-elevated);
+  background: var(--bg-surface);
+  transition: transform 0.3s cubic-bezier(0.2, 0, 0, 1), box-shadow 0.3s cubic-bezier(0.2, 0, 0, 1);
+}
+
+.game-card:hover {
+  transform: translateY(-4px);
   box-shadow: var(--shadow-card);
 }
 

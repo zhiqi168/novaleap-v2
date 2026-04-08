@@ -1,8 +1,8 @@
 <template>
-  <div class="h-full relative overflow-hidden coach-surface sm:mx-4 sm:rounded-t-[2rem] sm:border-t sm:border-x sm:border-border-subtle sm:shadow-lg">
-    <div class="relative z-10 h-full flex flex-col px-4 sm:px-6 lg:px-10">
-      <header class="pt-4 pb-3">
-        <div class="mx-auto max-w-[1080px] rounded-2xl bg-bg-surface backdrop-blur-xl border border-border-subtle shadow-[0_18px_40px_-30px_rgba(15,23,42,0.45)] px-4 py-3 sm:px-5 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+  <div class="h-full relative overflow-hidden coach-surface workspace-page workspace-scroll">
+    <div class="workspace-stack relative z-10 h-full flex flex-col">
+      <header class="pb-3">
+        <div class="workspace-titlebar coach-titlebar-inner px-4 py-3 sm:px-5 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
           <div>
             <h1 class="text-2xl font-bold text-text-primary leading-tight">知跃陪练</h1>
             <p class="text-sm text-text-secondary mt-1">技术问题、状态困惑、日常想法都可以聊，我会给你可执行支持</p>
@@ -11,21 +11,21 @@
           <div class="flex items-center gap-2 flex-wrap">
             <button
               type="button"
-              class="px-3 py-1.5 rounded-lg bg-bg-elevated border border-border-subtle text-xs text-text-secondary hover:text-text-primary transition-colors"
+              class="workspace-btn workspace-btn-muted px-3 py-1.5 rounded-lg text-xs"
               @click="newConversation"
             >
               新建对话
             </button>
             <button
               type="button"
-              class="px-3 py-1.5 rounded-lg bg-bg-elevated border border-border-subtle text-xs text-text-secondary hover:text-text-primary transition-colors"
+              class="workspace-btn workspace-btn-muted px-3 py-1.5 rounded-lg text-xs"
               @click="loadHistory"
             >
               刷新历史
             </button>
             <button
               type="button"
-              class="px-3 py-1.5 rounded-lg bg-bg-elevated border border-border-subtle text-xs text-text-secondary hover:text-rose-500 transition-colors"
+              class="workspace-btn workspace-btn-danger px-3 py-1.5 rounded-lg text-xs"
               @click="clearHistory"
             >
               清空历史
@@ -46,7 +46,7 @@
             <button
               v-for="item in quickPrompts"
               :key="item"
-              class="text-left rounded-2xl border border-border-subtle bg-bg-surface backdrop-blur-xl p-4 hover:border-ai-from/35 hover:bg-bg-elevated transition-colors shadow-[0_16px_30px_-26px_rgba(15,23,42,0.5)]"
+              class="workspace-panel text-left rounded-2xl p-4 hover:border-ai-from/35 hover:bg-bg-elevated transition-colors"
               @click="useQuickPrompt(item)"
             >
               <p class="text-xs text-text-secondary">快速开始</p>
@@ -98,10 +98,10 @@
 
       <div class="absolute left-0 right-0 bottom-0 px-4 sm:px-6 lg:px-10 pb-6 lg:pb-8 bg-gradient-to-t from-bg-base via-bg-base/90 to-transparent">
         <div class="max-w-[1080px] mx-auto">
-          <div class="relative flex items-end gap-3 rounded-[28px] border border-border-subtle bg-bg-surface backdrop-blur-xl px-3 sm:px-4 py-2 shadow-float">
+          <div class="workspace-shell relative flex items-end gap-3 rounded-[28px] border border-border-subtle bg-bg-surface backdrop-blur-xl px-3 sm:px-4 py-2 shadow-float">
             <div
               v-if="uploadImage"
-              class="absolute -top-16 left-4 bg-white/94 backdrop-blur-sm p-1 rounded-xl shadow-md ring-1 ring-black/5 flex items-center gap-1.5 z-10 animate-fade-in"
+              class="absolute -top-16 left-4 bg-bg-card backdrop-blur-sm p-1 rounded-xl shadow-md ring-1 ring-border-soft flex items-center gap-1.5 z-10 animate-fade-in"
             >
               <img :src="uploadImage" class="w-12 h-12 object-cover rounded-lg" />
               <button @click="uploadImage = null" class="coach-inline-icon p-1 transition-colors">
@@ -143,7 +143,7 @@
               </button>
 
               <button
-                class="coach-send-btn text-white px-5 sm:px-6 py-2.5 rounded-xl sm:rounded-2xl font-medium transition-transform active:scale-95 flex items-center gap-2 mr-1 disabled:opacity-50 disabled:cursor-not-allowed"
+                class="workspace-btn workspace-btn-primary coach-send-btn text-white px-5 sm:px-6 py-2.5 rounded-xl sm:rounded-2xl font-medium transition-transform active:scale-95 flex items-center gap-2 mr-1 disabled:opacity-50 disabled:cursor-not-allowed"
                 :disabled="(!inputMessage.trim() && !uploadImage) && !isStreaming"
                 @click="isStreaming ? abort() : sendMessage()"
               >
@@ -477,7 +477,7 @@ onMounted(() => {
 .coach-glow {
   position: absolute;
   border-radius: 999px;
-  filter: blur(130px);
+  filter: blur(56px);
 }
 
 .coach-glow-a {

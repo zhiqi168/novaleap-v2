@@ -1,8 +1,0 @@
-ALTER TABLE notes
-    ADD COLUMN reject_reason VARCHAR(240) NULL COMMENT '审核失败原因';
-
-ALTER TABLE notes
-    ADD COLUMN audit_source VARCHAR(32) NULL COMMENT '审核来源：AI/MANUAL/RULES';
-
-ALTER TABLE notes
-    ADD COLUMN audited_at DATETIME NULL COMMENT '审核时间';

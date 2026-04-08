@@ -1,16 +1,26 @@
 <template>
-  <div class="resume-page h-full flex flex-col md:flex-row relative sm:mx-4 sm:rounded-t-[2rem] sm:border-t sm:border-x sm:border-border-subtle sm:shadow-lg sm:overflow-hidden">
+  <div class="workspace-page workspace-scroll h-full">
+    <div class="workspace-stack h-full flex flex-col">
+      <header class="workspace-titlebar">
+        <div class="workspace-titlecopy">
+          <h1 class="workspace-title">简历工坊</h1>
+          <p class="workspace-subtitle">
+            上传 PDF 简历并设定目标岗位，系统会基于 STAR 结构生成可落地的优化版本。
+          </p>
+        </div>
+      </header>
+
+      <div class="workspace-shell resume-page mt-5 flex-1 min-h-0 flex flex-col md:flex-row relative overflow-hidden">
     
     <!-- 左侧：编写区域 -->
     <div class="resume-panel resume-upload-panel w-full md:w-1/2 h-1/2 md:h-full flex flex-col border-b md:border-b-0 md:border-r border-border-subtle p-6 lg:p-8">
       <div class="mb-6">
-        <h1 class="text-2xl font-bold text-text-primary mb-2">简历工坊</h1>
+        <h2 class="text-lg font-semibold text-text-primary mb-2">上传与岗位设定</h2>
         <p class="text-sm text-text-secondary pr-4">
-          上传您的 PDF 简历，让 <span class="text-ai-from font-medium">NovaLeap AI</span> 基于 STAR 法则深度优化，自动适配目标高薪岗位。
+          左侧完成简历上传与目标岗位设置，右侧将实时呈现优化结果与最终简历正文。
         </p>
       </div>
 
-      <!-- 编辑卡片 -->
       <div class="resume-upload-card flex-1 flex flex-col card overflow-hidden border border-border-subtle ring-0 ring-offset-0 transition-all group">
         <div class="px-5 py-3 border-b border-border-subtle flex justify-between items-center bg-bg-surface shrink-0">
           <span class="text-xs font-semibold text-text-secondary">简历上传 (支持 PDF)</span>
@@ -60,7 +70,7 @@
               v-model="targetRole"
               type="text"
               placeholder="请选择或输入目标岗位（支持自定义）"
-              class="w-full pl-[72px] pr-12 py-2 bg-bg-surface rounded border border-border-subtle text-sm outline-none focus:border-ai-from/70 transition-colors"
+              class="workspace-control w-full pl-[72px] pr-12 py-2 bg-bg-surface rounded border border-border-subtle text-sm outline-none focus:border-ai-from/70 transition-colors"
               @focus="isRoleDropdownOpen = true"
               @input="isRoleDropdownOpen = true"
               @blur="handleRoleInputBlur"
@@ -108,14 +118,14 @@
         <button 
           @click="optimize"
           :disabled="!selectedFile || isStreaming || isExtracting"
-          class="btn-ai resume-cta w-full sm:w-2/3 flex justify-center items-center gap-2 group disabled:opacity-50 disabled:cursor-not-allowed"
+          class="workspace-btn workspace-btn-primary btn-ai resume-cta w-full sm:w-2/3 flex justify-center items-center gap-2 group disabled:opacity-50 disabled:cursor-not-allowed"
         >
           <template v-if="isExtracting">
-             <LoadingDots class="bg-white/20 px-3" />
+             <LoadingDots class="bg-primary/20 px-3" />
              提取简历文本中...
           </template>
           <template v-else-if="isStreaming">
-            <LoadingDots class="bg-white/20 px-3" />
+            <LoadingDots class="bg-primary/20 px-3" />
             AI 分析中...
           </template>
           <template v-else>
@@ -174,6 +184,8 @@
           </div>
         </div>
       </div>
+    </div>
+  </div>
     </div>
   </div>
 </template>

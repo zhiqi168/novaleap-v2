@@ -1,7 +1,7 @@
 <template>
-  <div class="wish-wall-shell h-full flex flex-col relative overflow-hidden select-none sm:mx-4 sm:rounded-t-[2rem] sm:border-t sm:border-x sm:border-border-subtle sm:shadow-lg">
+  <div class="wish-wall-shell workspace-page h-full flex flex-col relative overflow-hidden select-none">
     <div class="absolute top-0 left-0 right-0 p-3 sm:p-6 md:p-8 z-[30] md:z-[100] pointer-events-none">
-      <div class="max-w-[360px] sm:max-w-3xl w-[76vw] sm:w-auto bg-bg-surface p-3 sm:p-4 rounded-2xl backdrop-blur-md inline-block shadow-sm ring-1 ring-border-subtle">
+      <div class="workspace-titlebar wish-titlebar max-w-[360px] sm:max-w-3xl w-[76vw] sm:w-auto p-3 sm:p-4 inline-block shadow-sm ring-1 ring-border-subtle">
         <h1 class="text-2xl font-bold text-text-primary flex items-center gap-3 mb-2">
           星愿墙
           <span class="px-2 py-0.5 rounded text-xs bg-bg-elevated/40 text-text-secondary">Live</span>
@@ -88,7 +88,7 @@
       <button
         @click="openSubmitDialog"
         :disabled="authStore.isGuest"
-        class="w-full sm:w-auto bg-white/90 backdrop-blur-xl px-6 sm:px-8 py-3.5 sm:py-4 rounded-full shadow-modal ring-1 ring-black/5 flex items-center justify-center gap-3 text-text-primary font-bold hover:scale-105 hover:bg-white transition-all active:scale-95 disabled:opacity-60 disabled:cursor-not-allowed disabled:hover:scale-100"
+        class="workspace-btn workspace-btn-primary w-full sm:w-auto backdrop-blur-xl px-6 sm:px-8 py-3.5 sm:py-4 rounded-full shadow-modal ring-1 ring-black/5 flex items-center justify-center gap-3 text-white font-bold hover:scale-105 transition-all active:scale-95 disabled:opacity-60 disabled:cursor-not-allowed disabled:hover:scale-100"
       >
         <span class="text-xl text-ai-from">✨</span>
         发布星愿
@@ -101,33 +101,33 @@
       class="fixed inset-0 z-[2000] flex items-center justify-center bg-black/30 backdrop-blur-sm px-4"
       @click.self="showSubmitDialog = false"
     >
-      <div class="bg-bg-elevated rounded-2xl shadow-2xl p-8 max-w-md w-full border border-border-subtle">
+      <div class="workspace-shell bg-bg-elevated rounded-2xl shadow-2xl p-8 max-w-md w-full border border-border-subtle">
         <h2 class="text-xl font-bold text-text-primary mb-4">许下你的星愿 ✨</h2>
         <textarea
           v-model="newWishContent"
           rows="4"
           maxlength="200"
           placeholder="写下你的技术梦想、职业目标或学习心愿..."
-          class="w-full border border-border-subtle bg-bg-surface rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-ai-from/30 focus:border-ai-from outline-none resize-none mb-4 custom-scrollbar text-text-primary placeholder:text-text-tertiary"
+          class="workspace-control w-full border border-border-subtle bg-bg-surface rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-ai-from/30 focus:border-ai-from outline-none resize-none mb-4 custom-scrollbar text-text-primary placeholder:text-text-tertiary"
         ></textarea>
         <input
           v-model="newWishCity"
           type="text"
           maxlength="40"
           placeholder="你所在的城市（可选）"
-          class="w-full border border-border-subtle bg-bg-surface rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-ai-from/30 focus:border-ai-from outline-none mb-4 text-text-primary placeholder:text-text-tertiary"
+          class="workspace-control w-full border border-border-subtle bg-bg-surface rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-ai-from/30 focus:border-ai-from outline-none mb-4 text-text-primary placeholder:text-text-tertiary"
         />
         <div class="flex gap-3">
           <button
             @click="showSubmitDialog = false"
-            class="flex-1 px-4 py-3 border border-border-subtle bg-bg-surface rounded-xl text-sm font-medium text-text-secondary hover:bg-bg-elevated transition-colors"
+            class="workspace-btn workspace-btn-muted flex-1 px-4 py-3 border border-border-subtle bg-bg-surface rounded-xl text-sm font-medium text-text-secondary hover:bg-bg-elevated transition-colors"
           >
             取消
           </button>
           <button
             @click="submitWish"
             :disabled="submitting || !newWishContent.trim()"
-            class="flex-1 px-4 py-3 bg-gradient-to-r from-ai-from to-ai-to text-white rounded-xl text-sm font-medium hover:opacity-90 transition-colors disabled:opacity-50"
+            class="workspace-btn workspace-btn-primary flex-1 px-4 py-3 bg-gradient-to-r from-ai-from to-ai-to text-white rounded-xl text-sm font-medium hover:opacity-90 transition-colors disabled:opacity-50"
           >
             {{ submitting ? '提交中...' : '发布星愿' }}
           </button>
@@ -140,20 +140,20 @@
       class="fixed inset-0 z-[2100] bg-black/25 backdrop-blur-[2px]"
       @click.self="closeComments"
     >
-      <aside class="absolute right-0 top-0 h-full w-full max-w-[430px] bg-bg-surface backdrop-blur-xl shadow-2xl border-l border-border-subtle flex flex-col">
+      <aside class="workspace-panel absolute right-0 top-0 h-full w-full max-w-[430px] rounded-none sm:rounded-l-3xl bg-bg-surface backdrop-blur-xl shadow-2xl border-l border-border-subtle flex flex-col">
         <header class="px-5 py-4 border-b border-border-subtle flex items-center justify-between">
           <div>
             <h3 class="text-base font-bold text-text-primary">星愿评论</h3>
             <p class="text-xs text-text-secondary mt-1">{{ activeWish?.content || '' }}</p>
           </div>
-          <button class="px-2.5 py-1 rounded-md bg-black/5 hover:bg-black/10 text-sm" @click="closeComments">关闭</button>
+          <button class="workspace-btn workspace-btn-muted px-2.5 py-1 rounded-md bg-black/5 hover:bg-black/10 text-sm" @click="closeComments">关闭</button>
         </header>
 
         <div class="flex-1 overflow-y-auto px-5 py-4 custom-scrollbar">
-          <div v-if="loadingComments" class="text-sm text-text-secondary py-8 text-center">评论加载中...</div>
-          <div v-else-if="comments.length === 0" class="text-sm text-text-secondary py-8 text-center">还没有评论，来做第一个留言的人吧。</div>
+          <div v-if="loadingComments" class="workspace-empty text-sm text-text-secondary py-8 text-center">评论加载中...</div>
+          <div v-else-if="comments.length === 0" class="workspace-empty text-sm text-text-secondary py-8 text-center">还没有评论，来做第一个留言的人吧。</div>
           <div v-else class="space-y-3">
-            <div v-for="comment in comments" :key="comment.id" class="rounded-xl bg-black/[0.03] border border-black/[0.05] p-3">
+            <div v-for="comment in comments" :key="comment.id" class="workspace-list-item rounded-xl bg-black/[0.03] border border-black/[0.05] p-3">
               <div class="flex items-center justify-between gap-2 mb-1">
                 <div class="text-sm font-semibold text-text-primary">
                   {{ comment.nickname || comment.username || '用户' }}
@@ -176,14 +176,14 @@
             maxlength="300"
             rows="3"
             placeholder="写下你的评论..."
-            class="w-full border border-border-subtle bg-bg-surface rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-ai-from/25 resize-none disabled:bg-bg-elevated disabled:text-text-tertiary text-text-primary"
+            class="workspace-control w-full border border-border-subtle bg-bg-surface rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-ai-from/25 resize-none disabled:bg-bg-elevated disabled:text-text-tertiary text-text-primary"
           ></textarea>
           <div class="mt-3 flex items-center justify-between">
             <span class="text-xs text-text-secondary">{{ newCommentContent.length }}/300</span>
             <div class="flex items-center gap-2">
               <button
                 v-if="authStore.isGuest"
-                class="px-3 py-2 rounded-lg text-sm border border-gray-200 hover:bg-gray-50"
+                class="workspace-btn workspace-btn-muted px-3 py-2 rounded-lg text-sm border border-gray-200 hover:bg-gray-50"
                 @click="goRegister"
               >
                 去注册
@@ -191,7 +191,7 @@
               <button
                 v-else
                 :disabled="submittingComment || !newCommentContent.trim()"
-                class="px-3 py-2 rounded-lg text-sm text-white bg-gradient-to-r from-ai-from to-ai-to disabled:opacity-50"
+                class="workspace-btn workspace-btn-primary px-3 py-2 rounded-lg text-sm text-white bg-gradient-to-r from-ai-from to-ai-to disabled:opacity-50"
                 @click="submitComment"
               >
                 {{ submittingComment ? '发送中...' : '发送评论' }}

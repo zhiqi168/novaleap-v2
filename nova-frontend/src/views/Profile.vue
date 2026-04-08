@@ -1,10 +1,17 @@
 ﻿<template>
-  <div class="profile-bg h-full overflow-y-auto px-6 py-8 bg-bg-base transition-colors duration-300">
-    <div class="max-w-[1180px] mx-auto bg-bg-surface border border-border-subtle rounded-[28px] shadow-card p-7 sm:p-9">
-      <h1 class="text-[34px] font-extrabold text-text-primary mb-7">个人资料</h1>
+  <div class="profile-bg workspace-page workspace-scroll h-full bg-bg-base transition-colors duration-300">
+    <div class="workspace-stack">
+      <header class="workspace-titlebar">
+        <div class="workspace-titlecopy">
+          <h1 class="workspace-title">个人资料</h1>
+          <p class="workspace-subtitle">统一维护昵称、密码、头像和个人标签，保持你在 NovaLeap 各模块中的身份一致性。</p>
+        </div>
+      </header>
+
+      <div class="workspace-shell mt-5 p-7 sm:p-9">
 
       <div class="grid grid-cols-1 lg:grid-cols-[340px_1fr] gap-8">
-        <section>
+        <section class="workspace-panel p-5 sm:p-6">
           <div class="avatar-preview" @mousemove="onAvatarMove" @mouseleave="resetAvatarTilt">
             <div class="avatar-inner" :style="avatarTransformStyle">{{ selectedAvatar }}</div>
           </div>
@@ -15,7 +22,7 @@
               v-for="avatar in avatarOptions"
               :key="avatar"
               type="button"
-              class="avatar-item"
+              class="avatar-item workspace-list-item"
               :class="{ active: selectedAvatar === avatar }"
               @click="selectedAvatar = avatar"
             >
@@ -25,23 +32,23 @@
           <p class="text-xs text-text-tertiary mt-3">仅支持选择表情头像，暂不支持自定义上传。</p>
         </section>
 
-        <section>
+        <section class="workspace-panel p-5 sm:p-6">
           <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
             <label class="field">
               <span>用户名</span>
-              <input :value="profile.username" disabled />
+              <input class="workspace-control" :value="profile.username" disabled />
             </label>
             <label class="field">
               <span>注册方式</span>
-              <input :value="accountLabel" disabled />
+              <input class="workspace-control" :value="accountLabel" disabled />
             </label>
             <label class="field">
               <span>昵称</span>
-              <input v-model.trim="form.nickname" placeholder="请输入昵称" />
+              <input class="workspace-control" v-model.trim="form.nickname" placeholder="请输入昵称" />
             </label>
             <label class="field">
               <span>新密码</span>
-              <input v-model="form.password" type="password" placeholder="不修改则留空" />
+              <input class="workspace-control" v-model="form.password" type="password" placeholder="不修改则留空" />
             </label>
           </div>
 
@@ -52,7 +59,7 @@
                 v-for="tag in tags"
                 :key="tag"
                 type="button"
-                class="tag-item"
+                class="tag-item workspace-chip"
                 :class="{ active: selectedTags.includes(tag) }"
                 @click="toggleTag(tag)"
               >
@@ -62,13 +69,14 @@
           </div>
 
           <div class="mt-8 flex items-center gap-3">
-            <button class="save-btn" :disabled="saving" @click="saveProfile">
+            <button class="workspace-btn workspace-btn-primary save-btn" :disabled="saving" @click="saveProfile">
               {{ saving ? '保存中...' : '保存资料' }}
             </button>
             <span v-if="tip" class="text-sm" :class="tipOk ? 'text-emerald-500' : 'text-red-500'">{{ tip }}</span>
           </div>
         </section>
       </div>
+    </div>
     </div>
   </div>
 </template>

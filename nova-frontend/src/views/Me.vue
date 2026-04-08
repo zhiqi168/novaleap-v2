@@ -1,11 +1,19 @@
-<template>
-  <div class="h-full relative overflow-hidden me-bg sm:mx-4 sm:rounded-t-[2rem] sm:border-t sm:border-x sm:border-border-subtle sm:shadow-lg">
+﻿<template>
+  <div class="h-full relative overflow-hidden me-bg workspace-page workspace-scroll">
     <canvas ref="confettiCanvas" class="absolute inset-0 w-full h-full pointer-events-none"></canvas>
 
-    <div class="relative z-10 h-full overflow-y-auto px-6 py-6 md:py-8">
-      <div class="max-w-[1120px] mx-auto text-center">
+    <div class="relative z-10 h-full overflow-y-auto custom-scrollbar">
+      <div class="workspace-stack max-w-[1120px] mx-auto text-center">
+        <header class="workspace-titlebar me-titlebar text-left">
+          <div class="workspace-titlecopy">
+            <h1 class="workspace-title">我的空间</h1>
+            <p class="workspace-subtitle">聚合身份信息、状态反馈与个人激励，保持所有模块中的体验一致。</p>
+          </div>
+        </header>
+
+        <section class="workspace-section">
         <h1 class="text-[clamp(40px,6vw,66px)] font-black leading-tight text-text-primary break-words">
-          {{ greetingPrefix }}，
+          {{ greetingPrefix }}锛?
           <span class="me-name-highlight text-transparent bg-clip-text">
             {{ displayNickname }}
           </span>
@@ -13,15 +21,15 @@
         <p class="mt-3 text-[clamp(28px,4.4vw,52px)] text-text-secondary leading-tight">{{ subLine }}</p>
 
         <div class="mt-8 flex flex-col items-center relative">
-          <button class="avatar-orbit" type="button" @click="goProfile" title="前往个人资料">
+          <button class="avatar-orbit" type="button" @click="goProfile" title="鍓嶅線涓汉璧勬枡">
             <div class="avatar-core">
               <span v-if="isEmoji(displayAvatar)">{{ displayAvatar }}</span>
               <img v-else :src="displayAvatar" alt="avatar" />
             </div>
           </button>
 
-          <button class="boost-btn mt-6" @click="cheerUp">♡ 给我打气</button>
-          <button class="profile-btn mt-3" @click="goProfile">个人资料</button>
+          <button class="workspace-btn workspace-btn-primary boost-btn mt-6" @click="cheerUp">鈾?缁欐垜鎵撴皵</button>
+          <button class="workspace-btn workspace-btn-muted profile-btn mt-3" @click="goProfile">涓汉璧勬枡</button>
 
           <div class="cheer-popup-layer" aria-live="polite">
             <div
@@ -35,10 +43,11 @@
           </div>
         </div>
 
-        <div class="mt-10 bg-bg-surface backdrop-blur-xl rounded-3xl shadow-card border border-border-subtle p-7 md:p-8 text-left">
-          <div class="text-xl font-bold text-text-primary">今日格言</div>
+        <div class="workspace-shell mt-10 bg-bg-surface backdrop-blur-xl rounded-3xl shadow-card border border-border-subtle p-7 md:p-8 text-left">
+          <div class="text-xl font-bold text-text-primary">浠婃棩鏍艰█</div>
           <div class="mt-5 text-[clamp(30px,4.2vw,52px)] font-medium text-text-primary tracking-tight leading-tight">{{ quote }}</div>
         </div>
+        </section>
       </div>
     </div>
   </div>
@@ -56,7 +65,7 @@ const currentHour = ref(new Date().getHours())
 let hourTimer = 0
 const greetingPrefix = computed(() => {
   const hour = currentHour.value
-  if (hour < 6) return '夜深了，早点休息哦'
+  if (hour < 6) return '夜深了，早点休息'
   if (hour < 11) return '早上好'
   if (hour < 14) return '中午好'
   if (hour < 18) return '下午好'
@@ -68,8 +77,8 @@ const subLine = '今天也是充满可能的一天'
 const quotePool = [
   '你写下的每一行代码，都在改变未来。',
   '坚持的背后，藏着最美的风景。',
-  '今天的一点进步，就是明天的巨大跨越。',
-  '把复杂的问题拆小，你就已经赢了一半。',
+  '今天的一点进步，就是明天的一大步。',
+  '把复杂问题拆小，你已经赢了一半。',
   '稳定输出，比偶尔爆发更强大。',
   '保持专注，时间会给你复利。',
 ]
@@ -113,12 +122,12 @@ const isGuest = computed(() => {
   if (authStore.isGuest) return true
   const nickname = String(authStore.nickname || '')
   const username = String(authStore.user?.username || authStore.username || '')
-  return nickname.startsWith('游客') || guestIdPattern.test(username)
+  return nickname.startsWith('娓稿') || guestIdPattern.test(username)
 })
 
 const displayAvatar = computed(() => {
   const avatar = String(authStore.avatar || '').trim()
-  if (!avatar) return '🥳'
+  if (!avatar) return '馃コ'
   if (/^https?:\/\//i.test(avatar)) return avatar
   return avatar
 })
@@ -126,7 +135,7 @@ const displayAvatar = computed(() => {
 const displayNickname = computed(() => {
   const raw = isGuest.value ? 'Nova 访客' : (authStore.nickname || '学习者')
   const text = String(raw || '').trim()
-  return text.length > 14 ? `${text.slice(0, 12)}…` : text
+  return text.length > 14 ? `${text.slice(0, 12)}...` : text
 })
 
 const isEmoji = (val) => typeof val === 'string' && !val.startsWith('http')
@@ -546,3 +555,4 @@ onUnmounted(() => {
   }
 }
 </style>
+

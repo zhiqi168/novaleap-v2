@@ -1,8 +1,8 @@
 
 <template>
-  <div class="h-full relative overflow-hidden notes-shell sm:mx-4 sm:rounded-t-[2rem] sm:border-t sm:border-x sm:border-border-subtle sm:shadow-lg">
+  <div class="h-full relative overflow-hidden notes-shell workspace-page workspace-shell sm:mx-4">
     <div class="relative z-10 h-full flex flex-col lg:flex-row">
-      <aside class="w-full lg:w-[400px] xl:w-[430px] border-b lg:border-b-0 lg:border-r border-border-subtle bg-bg-surface backdrop-blur-xl flex flex-col h-[48%] lg:h-full shrink-0">
+      <aside class="w-full lg:w-[430px] xl:w-[460px] border-b lg:border-b-0 lg:border-r border-border-subtle bg-bg-surface backdrop-blur-xl flex flex-col h-[48%] lg:h-full shrink-0">
         <div class="px-4 pt-4 pb-3 border-b border-border-subtle">
           <div class="flex items-center justify-between gap-2">
             <div>
@@ -10,9 +10,9 @@
               <p class="mt-1 text-sm text-text-secondary">沉淀思考，记录成长路径</p>
             </div>
             <div class="flex items-center gap-2">
-              <button class="px-3 py-1.5 rounded-lg text-xs border border-black/10 bg-white/90 text-slate-600 hover:bg-black/[0.03] transition-colors" @click="loadCurrentNotes">刷新</button>
+              <button class="workspace-btn workspace-btn-muted px-3 py-1.5 rounded-lg text-xs border border-black/10 bg-white/90 text-slate-600 hover:bg-black/[0.03] transition-colors" @click="loadCurrentNotes">刷新</button>
               <button
-                class="px-3 py-1.5 rounded-lg text-xs border transition-colors"
+                class="workspace-btn px-3 py-1.5 rounded-lg text-xs border transition-colors"
                 :class="canSubmitNote ? 'border-ai-from/35 text-ai-from bg-ai-from/10 hover:bg-ai-from/16' : 'border-black/10 text-slate-400 cursor-not-allowed'"
                 @click="openSubmitDialog"
               >
@@ -26,7 +26,7 @@
               v-model="searchQuery"
               @keyup.enter="loadCurrentNotes"
               type="text"
-              class="w-full rounded-xl border border-black/10 bg-black/[0.02] py-2.5 pl-10 pr-4 text-sm outline-none transition-all focus:border-ai-from/30 focus:bg-white focus:ring-2 focus:ring-ai-from/20"
+              class="workspace-control w-full rounded-xl border border-black/10 bg-black/[0.02] py-2.5 pl-10 pr-4 text-sm outline-none transition-all focus:border-ai-from/30 focus:bg-white focus:ring-2 focus:ring-ai-from/20"
               placeholder="搜索手记标题..."
             />
             <svg class="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -36,7 +36,7 @@
 
           <div class="mt-3 flex items-center gap-2 text-xs">
             <button
-              class="px-2.5 py-1 rounded-full border transition-colors"
+              class="workspace-chip px-2.5 py-1 rounded-full border transition-colors"
               :class="isViewingMine ? 'border-black/10 text-slate-500 bg-white/70 hover:bg-white' : 'border-indigo-200 text-indigo-600 bg-indigo-50'"
               @click="switchNoteMode('published')"
             >
@@ -55,7 +55,7 @@
             <button
               v-for="item in mineStatusOptions"
               :key="item.value"
-              class="px-2 py-1 rounded-full border transition-colors"
+              class="workspace-chip px-2 py-1 rounded-full border transition-colors"
               :class="mineStatusFilter === item.value ? 'border-sky-200 text-sky-600 bg-sky-50' : 'border-black/10 text-slate-500 bg-white/70 hover:bg-white'"
               @click="setMineStatusFilter(item.value)"
             >
@@ -70,14 +70,14 @@
         </div>
 
         <div class="flex-1 overflow-y-auto px-2 py-2 custom-scrollbar">
-          <div v-if="loading" class="p-8 text-center text-sm text-slate-500">手记加载中...</div>
+          <div v-if="loading" class="workspace-empty p-8 text-center text-sm text-slate-500">手记加载中...</div>
           <div v-else-if="!notes.length" class="p-8 text-center text-sm text-slate-500">暂无手记内容</div>
 
           <button
             v-for="note in notes"
             :key="note.id"
-            class="w-full text-left rounded-2xl mb-2 border p-3 transition-all duration-200 note-item"
-            :class="activeNote?.id === note.id ? 'border-ai-from/35 bg-ai-from/8 shadow-[0_14px_28px_-20px_rgba(99,102,241,0.55)]' : 'border-black/8 bg-white/80 hover:bg-white hover:border-black/14'"
+            class="workspace-list-item w-full text-left rounded-2xl mb-2 border p-3 transition-all duration-200 note-item"
+            :class="activeNote?.id === note.id ? 'workspace-list-item-active border-ai-from/35 bg-ai-from/8 shadow-[0_14px_28px_-20px_rgba(99,102,241,0.55)]' : 'border-black/8 bg-white/80 hover:bg-white hover:border-black/14'"
             @click="selectNote(note)"
           >
             <div class="flex gap-3">
@@ -232,7 +232,7 @@
     </div>
 
     <div v-if="showSubmitDialog" class="fixed inset-0 z-40 bg-black/30 backdrop-blur-sm flex items-center justify-center p-4" @click.self="closeSubmitDialog">
-      <div class="w-full max-w-2xl bg-white rounded-2xl border border-black/10 shadow-2xl">
+      <div class="w-full max-w-2xl bg-bg-card rounded-2xl border border-border-soft shadow-2xl">
         <div class="px-5 py-4 border-b border-black/8 flex items-center justify-between">
           <h3 class="text-base font-semibold text-slate-800">{{ isEditingNote ? '编辑手记（保存后自动复审）' : '投稿手记（AI 自动审核）' }}</h3>
           <button class="p-1.5 rounded hover:bg-black/5 text-slate-500" @click="closeSubmitDialog">
@@ -241,10 +241,10 @@
         </div>
 
         <div class="px-5 py-4 space-y-3">
-          <input v-model="submitForm.title" type="text" class="w-full px-3 py-2 rounded-lg border border-black/10 bg-white text-sm outline-none focus:ring-2 focus:ring-ai-from/25" placeholder="请输入手记标题" />
+          <input v-model="submitForm.title" type="text" class="workspace-control w-full px-3 py-2 rounded-lg border border-border-soft bg-bg-surface text-sm outline-none focus:ring-2 focus:ring-ai-from/25" placeholder="请输入手记标题" />
           <div class="grid grid-cols-1 sm:grid-cols-3 gap-2">
-            <input v-model="submitForm.category" type="text" class="w-full px-3 py-2 rounded-lg border border-black/10 bg-white text-sm outline-none focus:ring-2 focus:ring-ai-from/25" placeholder="分类（如 后端）" />
-            <div class="rounded-lg border border-black/10 bg-white px-2 py-1.5">
+            <input v-model="submitForm.category" type="text" class="w-full px-3 py-2 rounded-lg border border-border-soft bg-bg-surface text-sm outline-none focus:ring-2 focus:ring-ai-from/25" placeholder="分类（如 后端）" />
+            <div class="rounded-lg border border-border-soft bg-bg-surface px-2 py-1.5">
               <div class="text-[11px] text-slate-500">封面图标</div>
               <div class="mt-1 flex items-center gap-1.5 flex-wrap">
                 <button
@@ -259,26 +259,26 @@
                 </button>
               </div>
             </div>
-            <input v-model="submitForm.summary" type="text" class="w-full px-3 py-2 rounded-lg border border-black/10 bg-white text-sm outline-none focus:ring-2 focus:ring-ai-from/25" placeholder="摘要（可选）" />
+            <input v-model="submitForm.summary" type="text" class="w-full px-3 py-2 rounded-lg border border-border-soft bg-bg-surface text-sm outline-none focus:ring-2 focus:ring-ai-from/25" placeholder="摘要（可选）" />
           </div>
-          <textarea v-model="submitForm.content" rows="10" class="w-full px-3 py-2 rounded-lg border border-black/10 bg-white text-sm outline-none resize-y focus:ring-2 focus:ring-ai-from/25" placeholder="正文内容（支持 Markdown）"></textarea>
+          <textarea v-model="submitForm.content" rows="10" class="workspace-control w-full px-3 py-2 rounded-lg border border-border-soft bg-bg-surface text-sm outline-none resize-y focus:ring-2 focus:ring-ai-from/25" placeholder="正文内容（支持 Markdown）"></textarea>
           <p class="text-xs text-slate-500">{{ isEditingNote ? '保存后会重新进行违禁词审核：通过则立即展示，不通过会返回具体失败原因。' : '提交后会先进行违禁词审核：通过则立即展示，不通过会返回具体失败原因。' }}</p>
         </div>
 
         <div class="px-5 py-4 border-t border-black/8 flex justify-end gap-2">
-          <button class="px-3 py-2 rounded-lg border border-black/10 text-sm hover:bg-black/[0.03]" @click="closeSubmitDialog">取消</button>
-          <button class="px-3 py-2 rounded-lg text-sm text-white bg-gradient-to-r from-ai-from to-ai-to disabled:opacity-60" :disabled="submittingNote" @click="submitNote">{{ submittingNote ? (isEditingNote ? '保存中...' : '提交中...') : (isEditingNote ? '保存修改' : '提交审核') }}</button>
+          <button class="workspace-btn workspace-btn-muted px-3 py-2 rounded-lg border border-black/10 text-sm hover:bg-black/[0.03]" @click="closeSubmitDialog">取消</button>
+          <button class="workspace-btn workspace-btn-primary px-3 py-2 rounded-lg text-sm text-white bg-gradient-to-r from-ai-from to-ai-to disabled:opacity-60" :disabled="submittingNote" @click="submitNote">{{ submittingNote ? (isEditingNote ? '保存中...' : '提交中...') : (isEditingNote ? '保存修改' : '提交审核') }}</button>
         </div>
       </div>
     </div>
     <div v-if="commentPanelVisible" class="fixed inset-0 z-[1200] bg-black/25 backdrop-blur-[2px]" @click.self="closeComments">
-      <aside class="absolute right-0 top-0 h-full w-full max-w-[430px] bg-white/95 backdrop-blur-xl shadow-2xl border-l border-white/40 flex flex-col">
+      <aside class="absolute right-0 top-0 h-full w-full max-w-[430px] bg-bg-card backdrop-blur-xl shadow-2xl border-l border-border-soft flex flex-col">
         <header class="px-5 py-4 border-b border-black/5 flex items-center justify-between">
           <div>
             <h3 class="text-base font-bold text-slate-800">手记评论</h3>
             <p class="text-xs text-slate-500 mt-1 line-clamp-1">{{ activeNote?.title || '' }}</p>
           </div>
-          <button class="px-2.5 py-1 rounded-md bg-black/5 hover:bg-black/10 text-sm" @click="closeComments">关闭</button>
+          <button class="workspace-btn workspace-btn-muted px-2.5 py-1 rounded-md bg-black/5 hover:bg-black/10 text-sm" @click="closeComments">关闭</button>
         </header>
 
         <div class="flex-1 overflow-y-auto px-5 py-4 custom-scrollbar">
@@ -306,13 +306,13 @@
             maxlength="300"
             rows="3"
             placeholder="写下你的评论..."
-            class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-ai-from/25 resize-none disabled:bg-gray-50 disabled:text-gray-400"
+            class="workspace-control w-full border border-gray-200 rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-ai-from/25 resize-none disabled:bg-gray-50 disabled:text-gray-400"
           ></textarea>
           <div class="mt-3 flex items-center justify-between">
             <span class="text-xs text-slate-500">{{ newCommentContent.length }}/300</span>
             <button
               :disabled="submittingComment || !newCommentContent.trim() || !authStore.isLoggedIn || authStore.isGuest"
-              class="px-3 py-2 rounded-lg text-sm text-white bg-gradient-to-r from-ai-from to-ai-to disabled:opacity-50"
+              class="workspace-btn workspace-btn-primary px-3 py-2 rounded-lg text-sm text-white bg-gradient-to-r from-ai-from to-ai-to disabled:opacity-50"
               @click="submitComment"
             >
               {{ submittingComment ? '发送中...' : '发送评论' }}
@@ -904,7 +904,7 @@ onUnmounted(() => {
 .notes-glow {
   position: absolute;
   border-radius: 999px;
-  filter: blur(130px);
+  filter: blur(56px);
 }
 
 .notes-glow-a {
