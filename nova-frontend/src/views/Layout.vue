@@ -338,15 +338,17 @@ onBeforeUnmount(() => {
   gap: 10px;
   padding: 8px 10px;
   border-radius: 999px;
-  border: 1px solid rgba(255, 255, 255, 0.48);
-  border-bottom: 1px solid rgba(0, 0, 0, 0.05);
-  background: rgba(255, 255, 255, 0.7);
+  border: 1px solid rgba(255, 255, 255, 0.62);
+  border-bottom: 1px solid rgba(93, 84, 117, 0.12);
+  background:
+    linear-gradient(180deg, rgba(255, 251, 253, 0.82), rgba(255, 255, 255, 0.68));
   backdrop-filter: blur(22px) saturate(180%);
   -webkit-backdrop-filter: blur(22px) saturate(180%);
   transform: translateZ(0);
   box-shadow:
-    0 18px 40px rgba(55, 52, 76, 0.12),
-    inset 0 1px 0 rgba(255, 255, 255, 0.34);
+    0 18px 42px rgba(106, 103, 125, 0.12),
+    0 8px 18px rgba(227, 225, 238, 0.42),
+    inset 0 1px 0 rgba(255, 255, 255, 0.62);
 }
 
 .brand-pill {
@@ -354,17 +356,17 @@ onBeforeUnmount(() => {
   align-items: center;
   gap: 10px;
   border-radius: 999px;
-  border: 1px solid rgba(255, 255, 255, 0.38);
-  background: rgba(255, 255, 255, 0.38);
+  border: 1px solid rgba(255, 255, 255, 0.42);
+  background: rgba(255, 250, 252, 0.46);
   padding: 8px 12px;
   white-space: nowrap;
   transition: border-color 0.2s ease, background-color 0.2s ease, box-shadow 0.2s ease;
 }
 
 .brand-pill:hover {
-  border-color: rgba(248, 154, 165, 0.18);
-  background: rgba(255, 255, 255, 0.46);
-  box-shadow: 0 10px 24px rgba(248, 154, 165, 0.12);
+  border-color: rgba(248, 154, 165, 0.22);
+  background: rgba(255, 252, 253, 0.62);
+  box-shadow: 0 10px 24px rgba(248, 154, 165, 0.1);
 }
 
 .nav-center {
@@ -389,23 +391,25 @@ onBeforeUnmount(() => {
 }
 
 .nav-item-pill-idle {
-  color: rgba(0, 0, 0, 0.6);
+  color: rgba(39, 34, 53, 0.68);
 }
 
 .nav-item-pill-idle:hover {
-  background: linear-gradient(135deg, rgba(248, 154, 165, 0.1), rgba(248, 154, 165, 0.04));
-  border-color: rgba(248, 154, 165, 0.16);
-  color: color-mix(in srgb, var(--ai-from) 72%, var(--primary) 28%);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.32);
+  background: linear-gradient(135deg, rgba(248, 154, 165, 0.12), rgba(248, 154, 165, 0.045));
+  border-color: rgba(248, 154, 165, 0.18);
+  color: color-mix(in srgb, var(--ai-from) 56%, var(--primary) 44%);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.48),
+    0 8px 18px rgba(248, 154, 165, 0.06);
 }
 
 .nav-item-pill-active {
-  background: linear-gradient(135deg, rgba(248, 154, 165, 0.14), rgba(248, 154, 165, 0.05));
-  border-color: rgba(248, 154, 165, 0.24);
-  color: color-mix(in srgb, var(--ai-from) 78%, var(--primary) 22%);
+  background: linear-gradient(135deg, rgba(248, 154, 165, 0.16), rgba(248, 154, 165, 0.06));
+  border-color: rgba(248, 154, 165, 0.28);
+  color: color-mix(in srgb, var(--ai-from) 62%, var(--primary) 38%);
   box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.34),
-    0 8px 18px rgba(248, 154, 165, 0.12);
+    inset 0 1px 0 rgba(255, 255, 255, 0.58),
+    0 10px 22px rgba(248, 154, 165, 0.08);
 }
 
 .nav-actions {
@@ -424,17 +428,17 @@ onBeforeUnmount(() => {
   justify-content: center;
   flex-shrink: 0;
   border-radius: 999px;
-  border: 1px solid rgba(255, 255, 255, 0.36);
-  background: rgba(255, 255, 255, 0.34);
-  color: rgba(0, 0, 0, 0.6);
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  background: rgba(255, 250, 252, 0.42);
+  color: rgba(39, 34, 53, 0.68);
   transition: transform 0.2s ease, color 0.2s ease, border-color 0.2s ease, background-color 0.2s ease;
 }
 
 .icon-btn:hover {
   transform: translateY(-1px);
-  border-color: rgba(248, 154, 165, 0.18);
-  color: color-mix(in srgb, var(--ai-from) 72%, var(--primary) 28%);
-  background: linear-gradient(135deg, rgba(248, 154, 165, 0.1), rgba(248, 154, 165, 0.04));
+  border-color: rgba(248, 154, 165, 0.2);
+  color: color-mix(in srgb, var(--ai-from) 56%, var(--primary) 44%);
+  background: linear-gradient(135deg, rgba(248, 154, 165, 0.1), rgba(248, 154, 165, 0.035));
 }
 
 .icon-btn-danger {
@@ -449,17 +453,17 @@ onBeforeUnmount(() => {
   align-items: center;
   gap: 10px;
   border-radius: 999px;
-  border: 1px solid rgba(255, 255, 255, 0.36);
-  background: rgba(255, 255, 255, 0.34);
+  border: 1px solid rgba(255, 255, 255, 0.42);
+  background: rgba(255, 250, 252, 0.42);
   padding: 0 14px 0 10px;
   color: var(--text-primary);
   transition: border-color 0.2s ease, background-color 0.2s ease, box-shadow 0.2s ease;
 }
 
 .profile-pill:hover {
-  border-color: rgba(248, 154, 165, 0.18);
-  background: rgba(255, 255, 255, 0.46);
-  box-shadow: 0 10px 24px rgba(248, 154, 165, 0.12);
+  border-color: rgba(248, 154, 165, 0.22);
+  background: rgba(255, 252, 253, 0.58);
+  box-shadow: 0 10px 24px rgba(248, 154, 165, 0.08);
 }
 
 .profile-copy {
