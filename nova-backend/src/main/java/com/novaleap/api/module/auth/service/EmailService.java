@@ -19,10 +19,10 @@ public class EmailService {
     private static final Pattern EMAIL_PATTERN = Pattern.compile("^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}$");
     private static final String VERIFY_CODE_PREFIX = "verify_code:";
     private static final String VERIFY_COOLDOWN_PREFIX = "verify_code_cooldown:";
+    private static final String VERIFY_IP_WINDOW_PREFIX = "verify_code_ip_window:";
     private static final long VERIFY_CODE_TTL_MINUTES = 5;
-    private static final long VERIFY_COOLDOWN_SECONDS = 60;
-
-    private static final String VERIFY_IP_COOLDOWN_PREFIX = "verify_code_ip_cooldown:";
+    private static final long VERIFY_WINDOW_SECONDS = 60;
+    private static final long VERIFY_WINDOW_MAX_ATTEMPTS = 3;
 
     private final StringRedisTemplate redisTemplate;
     private final SecureRandom secureRandom = new SecureRandom();
@@ -58,18 +58,19 @@ public class EmailService {
             throw new IllegalStateException("邮件服务未配置，请联系管理员");
         }
 
-        // 1. Check Email Cooldown
-        String cooldownKey = buildCooldownKey(normalizedType, normalizedEmail);
-        Long cooldownSeconds = redisTemplate.getExpire(cooldownKey, TimeUnit.SECONDS);
+        String emailCooldownKey = buildCooldownKey(normalizedType, normalizedEmail);
+        Long cooldownSeconds = redisTemplate.getExpire(emailCooldownKey, TimeUnit.SECONDS);
         if (cooldownSeconds != null && cooldownSeconds > 0) {
-            throw new IllegalArgumentException("验证码发送过于频繁，请 " + cooldownSeconds + " 秒后再试");
+            throw new IllegalArgumentException("验证码发送频繁，请 " + cooldownSeconds + " 秒后再试");
         }
 
-        // 2. Check IP Cooldown (Generic for any type to prevent mass mail bombing)
+        String ipWindowKey = null;
         if (StringUtils.hasText(ip)) {
-            String ipCooldownKey = buildIpCooldownKey(ip);
-            if (Boolean.TRUE.equals(redisTemplate.hasKey(ipCooldownKey))) {
-                throw new IllegalArgumentException("请求过于频繁，请稍后再试");
+            ipWindowKey = buildIpWindowKey(ip);
+            try {
+                incrementIpWindowOrThrow(ipWindowKey);
+            } catch (RuntimeException ex) {
+                throw ex;
             }
         }
 
@@ -81,19 +82,11 @@ public class EmailService {
                 TimeUnit.MINUTES
         );
         redisTemplate.opsForValue().set(
-                cooldownKey,
+                emailCooldownKey,
                 "1",
-                VERIFY_COOLDOWN_SECONDS,
+                VERIFY_WINDOW_SECONDS,
                 TimeUnit.SECONDS
         );
-        if (StringUtils.hasText(ip)) {
-            redisTemplate.opsForValue().set(
-                    buildIpCooldownKey(ip),
-                    "1",
-                    VERIFY_COOLDOWN_SECONDS,
-                    TimeUnit.SECONDS
-            );
-        }
 
         String sceneText = switch (normalizedType) {
             case "reset" -> "重置密码";
@@ -118,6 +111,8 @@ public class EmailService {
             resend.emails().send(params);
         } catch (ResendException | RuntimeException ex) {
             consumeCode(normalizedEmail, normalizedType);
+            redisTemplate.delete(emailCooldownKey);
+            rollbackWindow(ipWindowKey);
             throw new IllegalStateException("邮件发送失败，请稍后重试", ex);
         }
     }
@@ -138,7 +133,6 @@ public class EmailService {
         String normalizedEmail = normalizeEmail(email);
         String normalizedType = normalizeType(type);
         redisTemplate.delete(buildVerifyCodeKey(normalizedType, normalizedEmail));
-        redisTemplate.delete(buildCooldownKey(normalizedType, normalizedEmail));
     }
 
     private String normalizeType(String type) {
@@ -157,8 +151,34 @@ public class EmailService {
         return VERIFY_COOLDOWN_PREFIX + type + ":" + email;
     }
 
-    private String buildIpCooldownKey(String ip) {
-        return VERIFY_IP_COOLDOWN_PREFIX + ip;
+    private String buildIpWindowKey(String ip) {
+        return VERIFY_IP_WINDOW_PREFIX + ip;
+    }
+
+    private void incrementIpWindowOrThrow(String key) {
+        Long count = redisTemplate.opsForValue().increment(key);
+        if (count != null && count == 1L) {
+            redisTemplate.expire(key, VERIFY_WINDOW_SECONDS, TimeUnit.SECONDS);
+        }
+        if (count != null && count > VERIFY_WINDOW_MAX_ATTEMPTS) {
+            long ttlSeconds = resolveRemainingWindowSeconds(key);
+            throw new IllegalArgumentException("请求过于频繁，请 " + ttlSeconds + " 秒后再试");
+        }
+    }
+
+    private long resolveRemainingWindowSeconds(String key) {
+        Long ttlSeconds = redisTemplate.getExpire(key, TimeUnit.SECONDS);
+        return ttlSeconds == null || ttlSeconds <= 0 ? VERIFY_WINDOW_SECONDS : ttlSeconds;
+    }
+
+    private void rollbackWindow(String key) {
+        if (!StringUtils.hasText(key)) {
+            return;
+        }
+        Long count = redisTemplate.opsForValue().decrement(key);
+        if (count != null && count <= 0) {
+            redisTemplate.delete(key);
+        }
     }
 
     private String safeTrim(String value) {

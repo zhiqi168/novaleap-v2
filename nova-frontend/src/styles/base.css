@@ -23,10 +23,10 @@
   --bg-soft: rgba(235, 236, 242, 0.82);
   --bg-ghost: rgba(230, 231, 238, 0.62);
   --text-tertiary: var(--text-muted);
-  --ai-from: #f1908c;
-  --ai-to: #ee6a7a;
-  --ai-glow: rgba(241, 144, 140, 0.24);
-  --ai-surface: rgba(241, 144, 140, 0.06);
+  --ai-from: #f89aa5;
+  --ai-to: #f89aa5;
+  --ai-glow: rgba(248, 154, 165, 0.26);
+  --ai-surface: rgba(248, 154, 165, 0.08);
   --accent-blue: #3b82f6;
   --success: #10b981;
   --success-rgb: 16, 185, 129;
@@ -129,7 +129,6 @@
       radial-gradient(36% 28% at 14% 8%, rgba(200, 206, 228, 0.32), transparent 70%),
       radial-gradient(25% 20% at 86% 12%, rgba(210, 215, 235, 0.34), transparent 72%),
       linear-gradient(180deg, #f4f5fb 0%, var(--bg-page) 44%, #e2e4f0 100%);
-    background-attachment: fixed;
     line-height: 1.6;
     overflow-x: hidden;
     transition: background 0.28s ease, color 0.28s ease;
@@ -174,13 +173,13 @@
   .btn-primary {
     @apply rounded-2xl px-6 py-3 text-white transition-all duration-200 active:scale-[0.98];
     background: linear-gradient(135deg, var(--ai-from), var(--ai-to));
-    box-shadow: 0 10px 24px rgba(0, 0, 0, 0.14);
+    box-shadow: 0 10px 24px var(--ai-glow);
     letter-spacing: 0.02em;
     font-weight: 600;
   }
 
   .btn-primary:hover {
-    box-shadow: 0 12px 28px rgba(0, 0, 0, 0.18);
+    box-shadow: 0 12px 28px rgba(248, 154, 165, 0.32);
     transform: translateY(-1px);
     filter: brightness(1.1);
   }
@@ -198,11 +197,11 @@
   .btn-ai {
     @apply rounded-2xl px-6 py-3 text-white transition-all duration-200 active:scale-[0.98];
     background: linear-gradient(135deg, var(--ai-from), var(--ai-to));
-    box-shadow: 0 14px 28px rgba(var(--primary-rgb), 0.24);
+    box-shadow: 0 14px 28px var(--ai-glow);
   }
 
   .btn-ai:hover {
-    box-shadow: 0 20px 34px rgba(var(--primary-rgb), 0.3);
+    box-shadow: 0 20px 34px rgba(248, 154, 165, 0.32);
   }
 
   .card {
@@ -586,8 +585,7 @@
     radial-gradient(96% 80% at 0% 0%, rgba(242, 242, 246, 0.88), transparent 66%),
     radial-gradient(84% 66% at 100% 8%, rgba(236, 236, 242, 0.7), transparent 68%),
     linear-gradient(180deg, #efeff3 0%, #e9e9ee 58%, #e4e4ea 100%);
-  --app-shell-bg:
-    linear-gradient(180deg, #ececf0 0%, #e8e8ed 100%);
+  --app-shell-bg: #eaebf1;
 }
 
 .dark {
@@ -602,10 +600,7 @@
     radial-gradient(96% 80% at 0% 0%, rgba(76, 70, 103, 0.34), transparent 68%),
     radial-gradient(84% 66% at 100% 8%, rgba(65, 88, 115, 0.24), transparent 70%),
     linear-gradient(180deg, #0f1118 0%, #131722 56%, #181c28 100%);
-  --app-shell-bg:
-    radial-gradient(96% 78% at 0% 0%, rgba(84, 78, 114, 0.3), transparent 68%),
-    radial-gradient(84% 66% at 100% 8%, rgba(69, 94, 124, 0.24), transparent 72%),
-    color-mix(in srgb, var(--bg-surface) 90%, #0f172a 10%);
+  --app-shell-bg: color-mix(in srgb, var(--bg-surface) 92%, #0f172a 8%);
 }
 
 @layer base {
@@ -767,7 +762,7 @@
     border-color: color-mix(in srgb, var(--ai-from) 36%, transparent);
     color: #fff;
     background: linear-gradient(135deg, var(--ai-from), var(--ai-to));
-    box-shadow: 0 10px 24px rgba(var(--primary-rgb), 0.24);
+    box-shadow: 0 10px 24px var(--ai-glow);
   }
 
   .workspace-btn-muted {

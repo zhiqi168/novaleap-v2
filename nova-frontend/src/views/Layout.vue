@@ -1,51 +1,53 @@
 <template>
-  <div class="app-layout relative h-screen w-full overflow-hidden bg-bg-base">
-    <div class="pointer-events-none absolute inset-0 z-0 overflow-hidden">
-      <div class="layout-glow layout-glow-a"></div>
-      <div class="layout-glow layout-glow-b"></div>
-      <div class="layout-glow layout-glow-c"></div>
-    </div>
+  <div class="app-layout">
+    <div class="app-atmosphere"></div>
 
-    <header class="fixed left-1/2 top-4 z-40 w-[min(1240px,calc(100%-16px))] -translate-x-1/2 sm:top-5 sm:w-[min(1240px,calc(100%-30px))]">
+    <header class="app-header">
       <div class="floating-nav">
         <button type="button" class="brand-pill" @click="navigateNav(navItems[0])">
           <img src="@/assets/logo.png" alt="logo" class="h-7 w-auto object-contain" />
           <div class="hidden min-w-0 text-left sm:block">
             <p class="text-sm font-semibold tracking-[-0.02em] text-text-primary">NovaLeap</p>
-            <p class="text-[11px] text-text-muted">知跃</p>
+            <p class="text-[11px] text-text-tertiary">知跃</p>
           </div>
         </button>
 
-        <nav class="nav-center hidden xl:flex items-center">
-            <div
-              v-for="item in navItems"
-              :key="`desktop-${item.name}-${item.path}`"
-              class="relative group h-full flex items-center"
-            >
-              <button
-                type="button"
-                class="nav-item-pill flex items-center gap-2"
-                :class="isNavActive(item) ? 'nav-item-pill-active' : 'nav-item-pill-idle'"
-                @click="navigateNav(item)"
-              >
-                <svg v-if="item.icon && NovaIcons[item.icon]" class="w-4 h-4 opacity-80" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" v-html="NovaIcons[item.icon]"></svg>
-                {{ item.name }}
-              </button>
-          </div>
+        <nav class="nav-center hidden xl:flex">
+          <button
+            v-for="item in navItems"
+            :key="`desktop-${item.name}-${item.path}`"
+            type="button"
+            class="nav-item-pill"
+            :class="isNavActive(item) ? 'nav-item-pill-active' : 'nav-item-pill-idle'"
+            @click="navigateNav(item)"
+          >
+            <svg
+              v-if="item.icon && NovaIcons[item.icon]"
+              class="h-4 w-4"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              v-html="NovaIcons[item.icon]"
+            ></svg>
+            <span>{{ item.name }}</span>
+          </button>
         </nav>
 
-        <div class="nav-actions hidden items-center gap-2 sm:flex">
+        <div class="nav-actions hidden sm:flex">
           <button
             type="button"
             class="icon-btn"
             :title="uiStore.isDarkMode ? '切换到浅色模式' : '切换到深色模式'"
             @click="uiStore.toggleDarkMode"
           >
-            <svg v-if="uiStore.isDarkMode" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="overflow: visible;">
+            <svg v-if="uiStore.isDarkMode" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <circle cx="12" cy="12" r="5" />
               <path d="M12 1v2m0 18v2M4.22 4.22l1.42 1.42m12.72 12.72l1.42 1.42M1 12h2m18 0h2M4.22 19.78l1.42-1.42m12.72-12.72l1.42-1.42" />
             </svg>
-            <svg v-else width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="overflow: visible;">
+            <svg v-else width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
             </svg>
           </button>
@@ -55,9 +57,7 @@
             <img v-else :src="displayAvatar" alt="avatar" class="profile-avatar profile-avatar-img" />
             <div class="profile-copy">
               <span class="profile-label">{{ authStore.isLoggedIn ? '我的' : '登录' }}</span>
-              <span class="profile-name hidden text-[11px] text-text-muted lg:block" :title="displayNicknameRaw">
-                {{ displayNickname }}
-              </span>
+              <span class="profile-name hidden lg:block" :title="displayNicknameRaw">{{ displayNickname }}</span>
             </div>
           </button>
 
@@ -82,13 +82,13 @@
       </div>
     </header>
 
-    <div v-if="mobileMenuOpen" class="fixed inset-0 z-40 bg-slate-900/18 backdrop-blur-sm sm:hidden" @click="mobileMenuOpen = false"></div>
+    <div v-if="mobileMenuOpen" class="mobile-mask sm:hidden" @click="mobileMenuOpen = false"></div>
 
     <aside class="mobile-drawer sm:hidden" :class="mobileMenuOpen ? 'translate-x-0' : 'translate-x-full'">
       <div class="flex items-center justify-between px-5 py-5">
         <div>
           <p class="text-lg font-semibold tracking-[-0.03em] text-text-primary">导航</p>
-          <p class="mt-1 text-xs uppercase tracking-[0.2em] text-text-muted">NovaLeap</p>
+          <p class="mt-1 text-xs uppercase tracking-[0.2em] text-text-tertiary">NovaLeap</p>
         </div>
         <button type="button" class="icon-btn" @click="mobileMenuOpen = false">
           <svg class="h-[18px] w-[18px]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -116,34 +116,36 @@
       <div class="space-y-2 border-t border-border-subtle px-4 py-4">
         <button type="button" class="mobile-action-btn" @click="goMe">
           <span>进入我的</span>
-          <span class="text-text-muted">{{ displayNickname }}</span>
+          <span class="text-text-tertiary">{{ displayNickname }}</span>
         </button>
         <button type="button" class="mobile-action-btn" @click="uiStore.toggleDarkMode">
           <span>{{ uiStore.isDarkMode ? '浅色模式' : '深色模式' }}</span>
-          <span class="text-text-muted">{{ uiStore.isDarkMode ? 'Light' : 'Dark' }}</span>
+          <span class="text-text-tertiary">{{ uiStore.isDarkMode ? 'Light' : 'Dark' }}</span>
         </button>
         <button v-if="authStore.isLoggedIn" type="button" class="mobile-logout-btn" @click="handleMobileLogout">退出登录</button>
       </div>
     </aside>
 
-    <div class="relative z-10 flex h-full flex-col">
-      <div class="h-[78px] shrink-0 sm:h-[92px]"></div>
-      <main class="min-h-0 flex-1 overflow-hidden">
-        <router-view v-slot="{ Component }">
-          <transition
-            enter-active-class="transition-opacity duration-200"
-            enter-from-class="opacity-0"
-            enter-to-class="opacity-100"
-            leave-active-class="transition-opacity duration-150"
-            leave-from-class="opacity-100"
-            leave-to-class="opacity-0"
-            mode="out-in"
-          >
-            <keep-alive :include="['Home', 'QuestionBank', 'Me']">
-              <component :is="Component" />
-            </keep-alive>
-          </transition>
-        </router-view>
+    <div class="app-main">
+      <div class="app-header-spacer"></div>
+      <main class="app-content">
+        <section class="workspace-host">
+          <router-view v-slot="{ Component }">
+            <transition
+              enter-active-class="transition-opacity duration-200"
+              enter-from-class="opacity-0"
+              enter-to-class="opacity-100"
+              leave-active-class="transition-opacity duration-150"
+              leave-from-class="opacity-100"
+              leave-to-class="opacity-0"
+              mode="out-in"
+            >
+              <keep-alive :include="['Home', 'QuestionBank', 'Me']">
+                <component :is="Component" />
+              </keep-alive>
+            </transition>
+          </router-view>
+        </section>
       </main>
     </div>
   </div>
@@ -252,7 +254,7 @@ const isNavActive = (item) => {
     return activeHomeSection.value === activeKey
   }
   if (item.path === '/') return route.path === '/'
-  return route.path.startsWith(item.path)
+  return route.path === item.path || route.path.startsWith(`${item.path}/`)
 }
 
 const goMe = () => {
@@ -302,84 +304,49 @@ onBeforeUnmount(() => {
 </script>
 
 <style scoped>
-.app-layout :deep([class~='text-slate-400']),
-.app-layout :deep([class~='text-slate-500']),
-.app-layout :deep([class~='text-slate-300']) {
-  color: var(--text-tertiary) !important;
+.app-layout {
+  position: relative;
+  isolation: isolate;
+  height: 100vh;
+  width: 100%;
+  overflow: hidden;
+  background: var(--app-shell-bg);
 }
 
-.app-layout :deep([class~='text-slate-700']),
-.app-layout :deep([class~='text-indigo-600']),
-.app-layout :deep([class~='text-indigo-500/80']) {
-  color: var(--primary) !important;
-}
-
-.app-layout :deep([class~='text-indigo-700']) {
-  color: color-mix(in srgb, var(--primary) 84%, black 16%) !important;
-}
-
-.app-layout :deep([class~='text-amber-500']) {
-  color: var(--rank-gold) !important;
-}
-
-.app-layout :deep([class~='border-slate-100']) {
-  border-color: var(--border-soft) !important;
-}
-
-.app-layout :deep([class~='border-white/60']) {
-  border-color: var(--border-soft) !important;
-}
-
-.app-layout :deep([class~='bg-indigo-50/50']) {
-  background: var(--accent-soft) !important;
-}
-
-.app-layout :deep([class~='bg-white/95']) {
-  background: var(--bg-elevated) !important;
-}
-
-.layout-glow {
+.app-atmosphere {
   position: absolute;
-  border-radius: 999px;
-  filter: blur(100px);
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background: transparent;
 }
 
-.layout-glow-a {
-  left: -64px;
-  top: -84px;
-  width: 280px;
-  height: 280px;
-  background: var(--module-glow-b);
-}
-
-.layout-glow-b {
-  right: 0;
-  top: 20px;
-  width: 280px;
-  height: 280px;
-  background: var(--module-glow-c);
-}
-
-.layout-glow-c {
-  left: 33%;
-  bottom: 0;
-  width: 320px;
-  height: 320px;
-  background: var(--module-glow-a);
+.app-header {
+  position: fixed;
+  left: 50%;
+  top: 14px;
+  z-index: 50;
+  width: min(1240px, calc(100% - 20px));
+  transform: translateX(-50%);
 }
 
 .floating-nav {
+  position: relative;
   display: grid;
   grid-template-columns: auto minmax(0, 1fr) auto;
   align-items: center;
-  gap: 12px;
-  border-radius: 999px;
-  border: 1px solid var(--border-soft);
-  background: var(--surface-panel-soft);
-  backdrop-filter: blur(20px);
-  box-shadow: var(--shadow-soft);
+  gap: 10px;
   padding: 8px 10px;
-  animation: navEnter 820ms cubic-bezier(0.22, 1, 0.36, 1);
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.48);
+  border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+  background: rgba(255, 255, 255, 0.7);
+  backdrop-filter: blur(22px) saturate(180%);
+  -webkit-backdrop-filter: blur(22px) saturate(180%);
+  transform: translateZ(0);
+  box-shadow:
+    0 18px 40px rgba(55, 52, 76, 0.12),
+    inset 0 1px 0 rgba(255, 255, 255, 0.34);
 }
 
 .brand-pill {
@@ -387,10 +354,17 @@ onBeforeUnmount(() => {
   align-items: center;
   gap: 10px;
   border-radius: 999px;
-  border: 1px solid var(--border-soft);
-  background: var(--bg-elevated);
+  border: 1px solid rgba(255, 255, 255, 0.38);
+  background: rgba(255, 255, 255, 0.38);
   padding: 8px 12px;
   white-space: nowrap;
+  transition: border-color 0.2s ease, background-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.brand-pill:hover {
+  border-color: rgba(248, 154, 165, 0.18);
+  background: rgba(255, 255, 255, 0.46);
+  box-shadow: 0 10px 24px rgba(248, 154, 165, 0.12);
 }
 
 .nav-center {
@@ -401,52 +375,66 @@ onBeforeUnmount(() => {
 }
 
 .nav-item-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
   border-radius: 999px;
+  border: 1px solid transparent;
   padding: 9px 14px;
   font-size: 13px;
-  font-weight: 500;
+  font-weight: 600;
   white-space: nowrap;
-  transition: color 0.2s ease, background-color 0.2s ease, transform 0.2s ease;
+  transition: color 0.2s ease, border-color 0.2s ease, background-color 0.2s ease, box-shadow 0.2s ease;
+  will-change: border-color, background-color, color;
 }
 
 .nav-item-pill-idle {
-  color: var(--text-secondary);
+  color: rgba(0, 0, 0, 0.6);
 }
 
 .nav-item-pill-idle:hover {
-  transform: translateY(-1px);
-  background: var(--primary-soft);
-  color: var(--text-primary);
+  background: linear-gradient(135deg, rgba(248, 154, 165, 0.1), rgba(248, 154, 165, 0.04));
+  border-color: rgba(248, 154, 165, 0.16);
+  color: color-mix(in srgb, var(--ai-from) 72%, var(--primary) 28%);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.32);
 }
 
 .nav-item-pill-active {
-  background: var(--accent-soft);
-  color: var(--primary);
+  background: linear-gradient(135deg, rgba(248, 154, 165, 0.14), rgba(248, 154, 165, 0.05));
+  border-color: rgba(248, 154, 165, 0.24);
+  color: color-mix(in srgb, var(--ai-from) 78%, var(--primary) 22%);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.34),
+    0 8px 18px rgba(248, 154, 165, 0.12);
 }
 
 .nav-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
   min-width: 0;
   justify-self: end;
 }
 
 .icon-btn {
-  width: 38px;
-  height: 38px;
+  width: 36px;
+  height: 36px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
   border-radius: 999px;
-  border: 1px solid var(--border-soft);
-  background: var(--bg-soft);
-  color: var(--text-secondary);
-  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-  overflow: visible; /* 确保图标阴影或微调不会被裁切 */
+  border: 1px solid rgba(255, 255, 255, 0.36);
+  background: rgba(255, 255, 255, 0.34);
+  color: rgba(0, 0, 0, 0.6);
+  transition: transform 0.2s ease, color 0.2s ease, border-color 0.2s ease, background-color 0.2s ease;
 }
 
 .icon-btn:hover {
   transform: translateY(-1px);
-  color: var(--text-primary);
+  border-color: rgba(248, 154, 165, 0.18);
+  color: color-mix(in srgb, var(--ai-from) 72%, var(--primary) 28%);
+  background: linear-gradient(135deg, rgba(248, 154, 165, 0.1), rgba(248, 154, 165, 0.04));
 }
 
 .icon-btn-danger {
@@ -461,10 +449,17 @@ onBeforeUnmount(() => {
   align-items: center;
   gap: 10px;
   border-radius: 999px;
-  border: 1px solid rgba(34, 27, 41, 0.1);
-  background: var(--bg-elevated);
+  border: 1px solid rgba(255, 255, 255, 0.36);
+  background: rgba(255, 255, 255, 0.34);
   padding: 0 14px 0 10px;
-  color: var(--primary);
+  color: var(--text-primary);
+  transition: border-color 0.2s ease, background-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.profile-pill:hover {
+  border-color: rgba(248, 154, 165, 0.18);
+  background: rgba(255, 255, 255, 0.46);
+  box-shadow: 0 10px 24px rgba(248, 154, 165, 0.12);
 }
 
 .profile-copy {
@@ -481,6 +476,8 @@ onBeforeUnmount(() => {
 }
 
 .profile-name {
+  font-size: 11px;
+  color: var(--text-tertiary);
   max-width: 100%;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -507,19 +504,25 @@ onBeforeUnmount(() => {
   display: none;
 }
 
+.mobile-mask {
+  position: fixed;
+  inset: 0;
+  z-index: 45;
+  background: rgba(15, 23, 42, 0.22);
+}
+
 .mobile-drawer {
   position: fixed;
   right: 0;
   top: 0;
   bottom: 0;
-  z-index: 50;
+  z-index: 60;
   width: min(84vw, 320px);
   display: flex;
   flex-direction: column;
   border-left: 1px solid var(--border-soft);
-  background: var(--surface-panel);
-  backdrop-filter: blur(18px);
-  box-shadow: -18px 0 44px rgba(34, 27, 41, 0.12);
+  background: var(--bg-elevated);
+  box-shadow: -26px 0 48px rgba(15, 23, 42, 0.2);
   transition: transform 0.26s ease;
 }
 
@@ -531,19 +534,21 @@ onBeforeUnmount(() => {
   align-items: center;
   justify-content: space-between;
   border-radius: 14px;
-  border: 1px solid var(--border-soft);
+  border: 1px solid var(--border-subtle);
   background: var(--bg-soft);
   padding: 0 12px;
   font-size: 13px;
 }
 
 .mobile-nav-item-idle {
-  color: var(--text-secondary);
+  color: var(--text-tertiary);
 }
 
 .mobile-nav-item-active {
   color: var(--primary);
   background: var(--accent-soft);
+  border-color: var(--accent-border);
+  font-weight: 600;
 }
 
 .mobile-logout-btn {
@@ -557,21 +562,34 @@ onBeforeUnmount(() => {
   font-weight: 600;
 }
 
-@keyframes navEnter {
-  0% {
-    opacity: 0;
-    transform: translateY(-12px);
-  }
-  100% {
-    opacity: 1;
-    transform: translateY(0);
-  }
+.app-main {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  height: 100%;
+  flex-direction: column;
 }
 
-@media (max-width: 1439px) {
-  .profile-pill {
-    max-width: 220px;
-  }
+.app-header-spacer {
+  height: 76px;
+  flex-shrink: 0;
+}
+
+.app-content {
+  min-height: 0;
+  flex: 1;
+  padding: 0;
+}
+
+.workspace-host {
+  margin: 0;
+  height: 100%;
+  width: 100%;
+  overflow: hidden;
+  border: none;
+  border-radius: 0;
+  background: var(--app-shell-bg);
+  box-shadow: none;
 }
 
 @media (max-width: 1279px) {
@@ -582,16 +600,38 @@ onBeforeUnmount(() => {
   .nav-actions {
     margin-left: auto;
   }
+
+  .workspace-host {
+    border-radius: 0;
+  }
 }
 
 @media (max-width: 639px) {
+  .app-header {
+    top: 10px;
+    width: calc(100% - 10px);
+  }
+
   .floating-nav {
     grid-template-columns: auto 1fr auto;
+    padding: 7px 8px;
   }
 
   .nav-mobile-trigger {
     display: inline-flex;
     justify-self: end;
+  }
+
+  .app-header-spacer {
+    height: 66px;
+  }
+
+  .app-content {
+    padding: 0;
+  }
+
+  .workspace-host {
+    border-radius: 0;
   }
 }
 
@@ -602,12 +642,38 @@ onBeforeUnmount(() => {
 .dark .mobile-drawer,
 .dark .mobile-nav-item,
 .dark .mobile-action-btn {
-  background: var(--surface-panel-soft);
-  border-color: rgba(255, 255, 255, 0.08);
+  background: color-mix(in srgb, var(--bg-elevated) 92%, #0f172a 8%);
+  border-color: rgba(255, 255, 255, 0.12);
+}
+
+.dark .floating-nav {
+  border-bottom-color: rgba(255, 255, 255, 0.08);
+  box-shadow:
+    0 22px 48px rgba(0, 0, 0, 0.42),
+    inset 0 1px 0 rgba(255, 255, 255, 0.08);
+}
+
+.dark .nav-item-pill-idle,
+.dark .icon-btn {
+  color: rgba(255, 255, 255, 0.68);
+}
+
+.dark .nav-item-pill-idle:hover,
+.dark .nav-item-pill-active,
+.dark .icon-btn:hover {
+  color: color-mix(in srgb, var(--ai-from) 74%, white 26%);
 }
 
 .dark .mobile-nav-item-active {
   background: var(--accent-soft);
   border-color: var(--accent-border);
+}
+
+.dark .workspace-host {
+  background: var(--app-shell-bg);
+}
+
+.dark .app-atmosphere {
+  background: transparent;
 }
 </style>

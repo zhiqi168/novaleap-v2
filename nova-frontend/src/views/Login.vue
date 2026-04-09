@@ -12,7 +12,7 @@
     <canvas ref="canvasRef" class="absolute inset-x-0 top-0 w-full h-full pointer-events-none z-10 opacity-90"></canvas>
 
     <!-- 玻璃拟态登录面板，包含品牌标识与交互表单 -->
-    <div class="relative z-20 flex w-[95%] md:w-[90%] max-w-[1240px] h-[85dvh] md:h-[760px] max-h-[900px] bg-white/40 backdrop-blur-[8px] rounded-[32px] border border-white/60 shadow-[0_20px_60px_-15px_rgba(0,0,0,0.15)] flex-col md:flex-row overflow-hidden">
+    <div class="relative z-20 flex w-[95%] md:w-[92%] max-w-[1320px] h-[88dvh] md:h-[800px] max-h-[940px] bg-white/40 backdrop-blur-[8px] rounded-[32px] border border-white/60 shadow-[0_20px_60px_-15px_rgba(0,0,0,0.15)] flex-col md:flex-row overflow-hidden">
       
       <!-- 左侧装饰区域：包含动态表情交互与视觉美化 -->
       <div class="w-full md:w-[45%] lg:w-[48%] bg-[#6B7584]/95 relative overflow-hidden hidden md:flex items-center justify-center shadow-inner">
@@ -147,7 +147,7 @@
       </div>
 
       <!-- 基础面部几何图形 -->
-      <div class="flex-1 w-full md:w-[52%] flex flex-col justify-center px-6 sm:px-10 lg:px-16 py-8 md:py-0 relative overflow-y-auto">
+      <div class="flex-1 w-full md:w-[52%] flex flex-col justify-center px-7 sm:px-12 lg:px-20 py-9 md:py-8 relative overflow-y-auto">
         
         <div class="mb-6 z-30">
           <div class="flex items-center gap-4 mb-6">
@@ -159,7 +159,7 @@
             </div>
           </div>
 
-          <div class="flex p-1 bg-slate-200/50 backdrop-blur-md rounded-2xl w-full max-w-[440px] mx-auto lg:mx-0">
+          <div class="flex p-1 bg-slate-200/50 backdrop-blur-md rounded-2xl w-full max-w-[460px] mx-auto lg:mx-0">
             <button
               type="button"
               class="flex-1 py-2.5 text-sm font-bold rounded-xl transition-all duration-300"
@@ -179,7 +179,7 @@
           </div>
         </div>
 
-        <form @submit.prevent="handleSubmit" class="space-y-5 w-full max-w-[440px] mx-auto lg:mx-0 z-30 relative">
+        <form @submit.prevent="handleSubmit" class="space-y-6 w-full max-w-[460px] mx-auto lg:mx-0 z-30 relative">
           <p v-if="error" class="text-xs text-red-600 bg-red-50/80 border border-red-200 shadow-sm rounded-xl px-4 py-3 text-center mb-1">
             {{ error }}
           </p>
@@ -218,11 +218,11 @@
             <div class="relative flex items-center">
               <input type="text" v-model="form.emailCode" required placeholder="输入 6 位验证码"
                      class="w-full bg-white/70 border border-slate-200/80 rounded-[14px] px-5 py-[12px] text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-[4px] focus:ring-indigo-500/10 focus:border-indigo-500 transition-all duration-300 shadow-sm pr-[110px]" />
-              <button type="button" @click.prevent="handleSendCode" :disabled="countdown > 0 || isSendingCode"
+              <button type="button" @click.prevent="handleSendCode" :disabled="sendCodeCooldown > 0 || isSendingCode"
                       class="absolute right-2 text-xs font-bold px-3 py-1.5 rounded-lg transition-all"
-                      :class="(countdown > 0 || isSendingCode) ? 'bg-slate-100 text-slate-400' : 'bg-indigo-100 text-indigo-600 hover:bg-indigo-200'">
+                      :class="(sendCodeCooldown > 0 || isSendingCode) ? 'bg-slate-100 text-slate-400' : 'bg-indigo-100 text-indigo-600 hover:bg-indigo-200'">
                 <span v-if="isSendingCode" class="w-3 h-3 border border-slate-400 border-t-transparent rounded-full animate-spin inline-block align-middle mr-1"></span>
-                {{ isSendingCode ? '正在发送...' : (countdown > 0 ? `${countdown}s 后重新获取` : '获取验证码') }}
+                {{ isSendingCode ? '正在发送...' : (sendCodeCooldown > 0 ? `${sendCodeCooldown}s 后重新获取` : '获取验证码') }}
               </button>
             </div>
           </div>
@@ -394,7 +394,7 @@ const form = reactive({
   consent: false
 })
 
-const countdown = ref(0)
+const sendCodeCooldown = ref(0)
 const isSendingCode = ref(false)
 
 const loading = ref(false)
@@ -436,6 +436,7 @@ const targetOffset = reactive({ x: 0, y: 0 })
 const currentOffset = reactive({ x: 0, y: 0 })
 
 let animationFrameId = null
+let sendCodeTimer = null
 let mouseX = window.innerWidth / 2 
 let mouseY = window.innerHeight / 2
 
@@ -591,6 +592,7 @@ onBeforeUnmount(() => {
   window.removeEventListener('mousemove', handleMouseMove)
   window.removeEventListener('resize', () => {})
   if (animationFrameId) cancelAnimationFrame(animationFrameId)
+  if (sendCodeTimer) clearInterval(sendCodeTimer)
 })
 
 const handleSubmit = async () => {
@@ -707,17 +709,25 @@ const handleSendCode = async () => {
     isSendingCode.value = true
     const type = activeTab.value === 'register' ? 'register' : (activeTab.value === 'login' ? 'login' : 'reset')
     await sendEmailCode(form.username, type)
-    countdown.value = 60
-    const timer = setInterval(() => {
-      countdown.value--
-      if (countdown.value <= 0) clearInterval(timer)
-    }, 1000)
-    error.value = '验证码已发送至您的邮箱'
+    startSendCodeCooldown()
+    error.value = '验证码已发送至您的邮箱，如未收到可稍后再试。'
   } catch (e) {
     error.value = e.message || '发送验证码失败'
   } finally {
     isSendingCode.value = false
   }
+}
+
+const startSendCodeCooldown = () => {
+  sendCodeCooldown.value = 60
+  if (sendCodeTimer) clearInterval(sendCodeTimer)
+  sendCodeTimer = setInterval(() => {
+    sendCodeCooldown.value--
+    if (sendCodeCooldown.value <= 0) {
+      clearInterval(sendCodeTimer)
+      sendCodeTimer = null
+    }
+  }, 1000)
 }
 
 const handleGuestLogin = async () => {
@@ -789,4 +799,5 @@ input:-webkit-autofill:active{
   border-radius: 14px;
   border: 1px solid rgba(255, 255, 255, 0.42);
 }
+
 </style>
