@@ -38,6 +38,7 @@ export const updateQuestion = (id, data) => api.put(`/api/admin/questions/${id}`
 export const deleteQuestion = (id) => api.delete(`/api/admin/questions/${id}`)
 export const getQuestionCategoryList = () => api.get('/api/admin/question-categories')
 export const createQuestionCategory = (data) => api.post('/api/admin/question-categories', data)
+export const deleteQuestionCategory = (code) => api.delete(`/api/admin/question-categories/${encodeURIComponent(code)}`)
 export const getCustomQuestionBankList = (page = 1, size = 10, status = '', keyword = '') => {
   let url = `/api/admin/question-banks?page=${page}&size=${size}`
   if (status !== '' && status !== null) url += `&status=${encodeURIComponent(status)}`
@@ -88,4 +89,4 @@ export const getDeadLetterWishes = (size = 20) => api.get(`/api/admin/wishes/dea
 export const retryWishReview = (id) => api.post(`/api/admin/wishes/${id}/retry`)
 
 // ===== Auth =====
-export const adminLogin = (data) => api.post('/api/auth/login', data)
+export const adminLogin = (data) => api.post('/api/admin/auth/login', data)

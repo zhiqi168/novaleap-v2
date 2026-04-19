@@ -32,8 +32,12 @@ public class LeaderboardController {
     }
 
     @GetMapping
-    public Result<Map<String, Object>> getLeaderboard() {
-        return Result.success(leaderboardService.getLeaderboard());
+    public Result<Map<String, Object>> getLeaderboard(Authentication authentication) {
+        Map<String, Object> data = leaderboardService.getLeaderboard();
+        if (!currentUserService.isAnonymous(authentication) && !currentUserService.isGuest(authentication)) {
+            data.put("currentUser", leaderboardService.getUserSnapshot(currentUserService.current(authentication).safeUsername()));
+        }
+        return Result.success(data);
     }
 
     @GetMapping("/question-done")

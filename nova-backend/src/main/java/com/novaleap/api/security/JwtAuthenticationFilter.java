@@ -1,5 +1,6 @@
 package com.novaleap.api.security;
 
+import com.novaleap.api.module.auth.support.AuthPortal;
 import com.novaleap.api.module.auth.support.AuthTokenStateSupport;
 import io.jsonwebtoken.Claims;
 import jakarta.servlet.FilterChain;
@@ -14,7 +15,8 @@ import org.springframework.util.StringUtils;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
-import java.util.Collections;
+import java.util.ArrayList;
+import java.util.List;
 
 @Component
 public class JwtAuthenticationFilter extends OncePerRequestFilter {
@@ -37,18 +39,24 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             try {
                 Claims claims = jwtUtils.parseToken(token);
                 String username = claims.getSubject();
-                if (!authTokenStateSupport.isTokenActive(username, claims.getIssuedAt())) {
+                Long issuedAtMillis = claims.get("iat_ms", Long.class);
+                if (!authTokenStateSupport.isTokenActive(username, claims.getIssuedAt(), issuedAtMillis)) {
                     SecurityContextHolder.clearContext();
                     chain.doFilter(request, response);
                     return;
                 }
 
                 String role = claims.get("role", String.class);
+                AuthPortal portal = AuthPortal.fromClaim(claims.get("portal", String.class));
                 if (StringUtils.hasText(username)) {
+                    List<SimpleGrantedAuthority> authorities = new ArrayList<>();
+                    authorities.add(new SimpleGrantedAuthority("ROLE_" + (StringUtils.hasText(role) ? role : "USER")));
+                    authorities.add(new SimpleGrantedAuthority(portal.authority()));
+
                     UsernamePasswordAuthenticationToken authentication = new UsernamePasswordAuthenticationToken(
                             username,
                             null,
-                            Collections.singletonList(new SimpleGrantedAuthority("ROLE_" + (StringUtils.hasText(role) ? role : "USER")))
+                            authorities
                     );
                     SecurityContextHolder.getContext().setAuthentication(authentication);
                 }

@@ -100,15 +100,14 @@
                 <span>星愿墙 · 成长反馈</span>
                 <span class="preview-pill preview-pill-soft">Community</span>
               </div>
-              <div class="mt-4 space-y-3">
-                <div v-for="item in questionTopFive" :key="`q-${item.userId}`" class="row-card">
-                  <div class="row-main">
-                    <span class="row-index">#{{ item.rank }}</span>
-                    <span class="truncate">{{ item.displayName }}</span>
+              <div class="timeline">
+                <div v-for="item in communitySteps" :key="item.index" class="timeline-row">
+                  <span class="timeline-index">{{ item.index }}</span>
+                  <div>
+                    <p class="timeline-title">{{ item.title }}</p>
+                    <p class="timeline-copy">{{ item.copy }}</p>
                   </div>
-                  <strong class="row-value">{{ item.questionDone }}</strong>
                 </div>
-                <div v-if="!questionTopFive.length" class="empty-card">这里会展示成长榜单和当下最稳定的学习节奏。</div>
               </div>
             </article>
           </template>
@@ -249,20 +248,26 @@ const resumeSteps = [
   { index: '2', title: '关键动作', copy: '把真正由你完成的设计、取舍和实现说清楚。' },
   { index: '3', title: '结果反馈', copy: '最终用量化结果和可验证影响收住整段表达。' },
 ]
+
+const communitySteps = [
+  { index: '1', title: '目标公开', copy: '把这一阶段想完成的方向说出来，让目标从脑海里的念头变成可被看见的承诺。' },
+  { index: '2', title: '成长反馈', copy: '记录阶段进展、卡点和变化，让每一次推进都能留下被回应和被确认的痕迹。' },
+  { index: '3', title: '社区感', copy: '在彼此可见的节奏里获得陪伴，不只知道要去哪里，也知道有人和你一起往前走。' },
+]
 </script>
 
 <style scoped>
 .preview-shell {
-  border-radius: 34px;
+  border-radius: var(--radius-xl);
   padding: 18px;
   background: var(--surface-panel);
   border: 1px solid var(--border-soft);
-  box-shadow: var(--shadow-float);
-  backdrop-filter: blur(22px);
+  box-shadow: var(--shadow-hover);
+  backdrop-filter: blur(8px);
 }
 
 .preview-window {
-  border-radius: 28px;
+  border-radius: var(--radius-lg);
   border: 1px solid var(--border-soft);
   background: var(--bg-elevated);
   padding: 24px;
@@ -323,7 +328,7 @@ const resumeSteps = [
 .metric-card,
 .panel-card,
 .note-card {
-  border-radius: 24px;
+  border-radius: var(--radius-lg);
   border: 1px solid var(--border-soft);
   background: var(--bg-soft);
   box-shadow: var(--shadow-card);

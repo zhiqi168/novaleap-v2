@@ -96,7 +96,7 @@
         </div>
       </div>
 
-      <div class="absolute left-0 right-0 bottom-0 px-4 sm:px-6 lg:px-10 pb-6 lg:pb-8 bg-gradient-to-t from-bg-base via-bg-base/90 to-transparent">
+      <div class="absolute left-0 right-0 bottom-0 px-4 sm:px-6 lg:px-10 pb-6 lg:pb-8">
         <div class="max-w-[1080px] mx-auto">
           <div class="workspace-shell relative flex items-end gap-3 rounded-[28px] border border-border-subtle bg-bg-surface backdrop-blur-xl px-3 sm:px-4 py-2 shadow-float">
             <div
@@ -170,6 +170,7 @@
 <script setup>
 import { computed, nextTick, onMounted, ref, watch } from 'vue'
 import TypeWriter from '@/components/common/TypeWriter.vue'
+import { useAutoPageRefresh } from '@/composables/useAutoPageRefresh'
 import { useSSE } from '@/composables/useSSE'
 import { api } from '@/composables/useRequest'
 import { useAuthStore } from '@/stores/auth'
@@ -459,6 +460,14 @@ const clearHistory = async () => {
   inputMessage.value = ''
   uploadImage.value = null
 }
+
+useAutoPageRefresh(async () => {
+  if (!isStreaming.value) {
+    await loadHistory()
+  }
+}, {
+  throttleMs: 5000,
+})
 
 onMounted(() => {
   loadHistory()

@@ -159,6 +159,21 @@ public class AiPromptFactory {
                 """.formatted(safe(content));
     }
 
+    public String buildDailyQuotePrompt(String nickname) {
+        return """
+                Write one daily motivational quote in Simplified Chinese for NovaLeap users.
+                Requirements:
+                - output only the quote itself
+                - 16 to 28 Chinese characters preferred
+                - warm, grounded, encouraging
+                - no markdown, no quotes, no numbering, no emoji
+                - avoid being too generic or preachy
+
+                User nickname for light personalization:
+                %s
+                """.formatted(safe(nickname).isBlank() ? "学习者" : safe(nickname));
+    }
+
     private String safe(String value) {
         return value == null ? "" : value.trim();
     }

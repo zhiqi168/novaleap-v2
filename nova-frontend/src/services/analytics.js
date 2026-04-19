@@ -1,3 +1,5 @@
+import { withApiBase } from '@/config/api'
+
 const VISITOR_KEY = 'nova_visitor_id'
 
 let lastTrackedPath = ''
@@ -40,13 +42,13 @@ export async function reportVisit(path) {
     'Content-Type': 'application/json'
   }
 
-  const token = localStorage.getItem('nova_token')
+  const token = sessionStorage.getItem('nova_token') || localStorage.getItem('nova_token')
   if (token) {
     headers.Authorization = `Bearer ${token}`
   }
 
   try {
-    await fetch('/api/analytics/visit', {
+    await fetch(withApiBase('/api/analytics/visit'), {
       method: 'POST',
       headers,
       body: JSON.stringify({

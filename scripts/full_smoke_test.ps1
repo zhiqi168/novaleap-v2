@@ -1,6 +1,12 @@
+param(
+    [string]$BaseUrl = "http://localhost:8080",
+    [string]$AdminUsername = "admin",
+    [string]$AdminPassword = "123456"
+)
+
 $ErrorActionPreference = "Stop"
 
-$baseUrl = "http://localhost:8080"
+$baseUrl = $BaseUrl.TrimEnd("/")
 $results = New-Object System.Collections.Generic.List[object]
 
 function Add-Result {
@@ -44,9 +50,17 @@ function Invoke-Api {
         } else {
             $resp = Invoke-RestMethod -Method $Method -Uri $url -Headers $Headers -TimeoutSec 45
         }
-        return [PSCustomObject]@{ Ok = $true; Resp = $resp; Error = "" }
+        return [PSCustomObject]@{ Ok = $true; Resp = $resp; Error = ""; HttpStatus = 200 }
     } catch {
-        return [PSCustomObject]@{ Ok = $false; Resp = $null; Error = (Read-ErrorBody $_.Exception) }
+        $raw = Read-ErrorBody $_.Exception
+        $resp = $null
+        try {
+            if ($raw) {
+                $resp = $raw | ConvertFrom-Json
+            }
+        } catch {}
+        $httpStatus = if ($_.Exception.Response) { [int]$_.Exception.Response.StatusCode } else { -1 }
+        return [PSCustomObject]@{ Ok = $false; Resp = $resp; Error = $raw; HttpStatus = $httpStatus }
     }
 }
 
@@ -74,7 +88,7 @@ function Expect-ResultCode {
         [object]$Call,
         [int]$Code
     )
-    if ($Call.Ok -and $Call.Resp.code -eq $Code) {
+    if ($null -ne $Call.Resp -and $Call.Resp.code -eq $Code) {
         Add-Result -Name $Name -Ok $true -Detail ("code=" + $Code)
         return $true
     }
@@ -135,10 +149,10 @@ function Test-SseEndpoint {
     return $false
 }
 
-Write-Host "Running smoke tests..."
+Write-Host ("Running smoke tests against {0} ..." -f $baseUrl)
 
 # Auth flows
-$adminLogin = Invoke-Api -Method POST -Path "/api/auth/login" -Body @{ username = "admin"; password = "123456" }
+$adminLogin = Invoke-Api -Method POST -Path "/api/admin/auth/login" -Body @{ username = $AdminUsername; password = $AdminPassword }
 if (-not (Expect-ResultCode200 -Name "Auth.AdminLogin" -Call $adminLogin)) {
     $results | Format-Table -AutoSize
     exit 1
@@ -146,18 +160,19 @@ if (-not (Expect-ResultCode200 -Name "Auth.AdminLogin" -Call $adminLogin)) {
 $adminToken = $adminLogin.Resp.data.token
 $adminHeaders = @{ Authorization = "Bearer $adminToken" }
 
-$userName = "smoke_" + [Guid]::NewGuid().ToString("N").Substring(0, 8)
-$register = Invoke-Api -Method POST -Path "/api/auth/register" -Body @{ username = $userName; password = "123456"; nickname = "smoke_user" }
-Expect-ResultCode200 -Name "Auth.Register" -Call $register | Out-Null
+$userName = "smoke_" + [Guid]::NewGuid().ToString("N").Substring(0, 8) + "@example.com"
+$userCreate = Invoke-Api -Method POST -Path "/api/admin/users" -Headers $adminHeaders -Body @{
+    username = $userName
+    password = "123456"
+    nickname = "smoke_user"
+    role = "USER"
+}
+Expect-ResultCode200 -Name "Admin.UserCreateForSmoke" -Call $userCreate | Out-Null
 
 $userToken = $null
-if ($register.Ok -and $register.Resp.code -eq 200) {
-    $userToken = $register.Resp.data.token
-} else {
-    $userLogin = Invoke-Api -Method POST -Path "/api/auth/login" -Body @{ username = $userName; password = "123456" }
-    if (Expect-ResultCode200 -Name "Auth.UserLoginAfterRegister" -Call $userLogin) {
-        $userToken = $userLogin.Resp.data.token
-    }
+$userLogin = Invoke-Api -Method POST -Path "/api/auth/login" -Body @{ username = $userName; password = "123456" }
+if (Expect-ResultCode200 -Name "Auth.UserLogin" -Call $userLogin) {
+    $userToken = $userLogin.Resp.data.token
 }
 if (-not $userToken) {
     $results | Format-Table -AutoSize
@@ -277,7 +292,7 @@ if ($approvedWishId) {
     $wishLikeGuest = Invoke-Api -Method POST -Path "/api/wishes/$approvedWishId/like" -Headers $guestHeaders -Body @{
         visitorId = "smoke_" + [Guid]::NewGuid().ToString("N").Substring(0, 8)
     }
-    Expect-ResultCode200 -Name "Wish.LikeByGuest" -Call $wishLikeGuest | Out-Null
+    Expect-ResultCode -Name "Wish.LikeByGuestForbidden" -Call $wishLikeGuest -Code 403 | Out-Null
 
     $wishCommentsGet = Invoke-Api -Method GET -Path "/api/wishes/$approvedWishId/comments"
     Expect-ResultCode200 -Name "Wish.CommentList" -Call $wishCommentsGet | Out-Null
@@ -328,6 +343,8 @@ if ($newNoteId) {
     Expect-ResultCode200 -Name "Note.ViewPlusOne" -Call $noteView | Out-Null
 
     $noteUpdate = Invoke-Api -Method PUT -Path "/api/notes/$newNoteId" -Headers $userHeaders -Body @{
+        title = "smoke_note_updated"
+        content = "smoke note body updated"
         summary = "smoke summary"
     }
     Expect-ResultCode200 -Name "Note.Update" -Call $noteUpdate | Out-Null
@@ -344,7 +361,7 @@ Test-SseEndpoint -Name "AI.CoachChatSSE" -Method "POST" -Path "/api/ai/coach/cha
 if ($questionId) {
     Test-SseEndpoint -Name "AI.QuestionExplainSSE" -Method "GET" -Path "/api/ai/question/$questionId/explain" -Token "" | Out-Null
 }
-Test-SseEndpoint -Name "AI.ResumeAnalyzeSSE" -Method "POST" -Path "/api/ai/resume/analyze" -PayloadJson '{"resumeText":"Java backend 2 years","targetRole":"Java backend"}' -Token "" | Out-Null
+Test-SseEndpoint -Name "AI.ResumeAnalyzeSSE" -Method "POST" -Path "/api/ai/resume/analyze" -PayloadJson '{"resumeText":"Java backend 2 years","targetRole":"Java backend"}' -Token $userToken | Out-Null
 
 $coachClear = Invoke-Api -Method DELETE -Path "/api/ai/coach/history" -Headers $userHeaders
 Expect-ResultCode200 -Name "AI.CoachHistoryClear" -Call $coachClear | Out-Null
@@ -437,7 +454,12 @@ if ($tmpAdminNoteId) {
     $adminNoteDetail = Invoke-Api -Method GET -Path "/api/admin/notes/$tmpAdminNoteId" -Headers $adminHeaders
     Expect-ResultCode200 -Name "Admin.NoteDetail" -Call $adminNoteDetail | Out-Null
 
-    $adminNoteUpdate = Invoke-Api -Method PUT -Path "/api/admin/notes/$tmpAdminNoteId" -Headers $adminHeaders -Body @{ summary = "admin smoke summary"; status = 1 }
+    $adminNoteUpdate = Invoke-Api -Method PUT -Path "/api/admin/notes/$tmpAdminNoteId" -Headers $adminHeaders -Body @{
+        title = "admin_smoke_note_updated"
+        content = "admin smoke note updated"
+        summary = "admin smoke summary"
+        status = 1
+    }
     Expect-ResultCode200 -Name "Admin.NoteUpdate" -Call $adminNoteUpdate | Out-Null
 
     $adminNoteDelete = Invoke-Api -Method DELETE -Path "/api/admin/notes/$tmpAdminNoteId" -Headers $adminHeaders

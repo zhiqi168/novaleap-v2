@@ -83,6 +83,7 @@
 
 <script setup>
 import { computed, onMounted, reactive, ref } from 'vue'
+import { useAutoPageRefresh } from '@/composables/useAutoPageRefresh'
 import { api } from '@/composables/useRequest'
 import { useAuthStore } from '@/stores/auth'
 
@@ -215,6 +216,17 @@ const saveProfile = async () => {
   }
 }
 
+useAutoPageRefresh(async () => {
+  try {
+    await loadProfile()
+  } catch (e) {
+    tipOk.value = false
+    tip.value = e.message || '资料加载失败'
+  }
+}, {
+  throttleMs: 4000,
+})
+
 onMounted(async () => {
   try {
     await loadProfile()
@@ -227,10 +239,7 @@ onMounted(async () => {
 
 <style scoped>
 .profile-bg {
-  background:
-    radial-gradient(110% 100% at 95% 0, var(--module-glow-c), transparent 55%),
-    radial-gradient(100% 100% at 5% 0, var(--module-glow-a), transparent 55%),
-    linear-gradient(180deg, #f7f5f1, var(--bg-base));
+  background: var(--app-shell-bg);
 }
 
 .avatar-preview {

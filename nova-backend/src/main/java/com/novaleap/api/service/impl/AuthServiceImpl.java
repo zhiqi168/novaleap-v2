@@ -7,15 +7,16 @@ import com.novaleap.api.common.exception.NotFoundException;
 import com.novaleap.api.common.exception.UnauthorizedException;
 import com.novaleap.api.entity.User;
 import com.novaleap.api.mapper.UserMapper;
+import com.novaleap.api.module.auth.service.SharedAuthLoginService;
 import com.novaleap.api.module.auth.support.AuthCheckinSupport;
+import com.novaleap.api.module.auth.support.AuthPortal;
 import com.novaleap.api.module.auth.support.AuthPasswordSupport;
 import com.novaleap.api.module.auth.support.AuthRateLimitSupport;
+import com.novaleap.api.module.auth.support.AuthRoleSupport;
 import com.novaleap.api.module.auth.support.AuthTokenStateSupport;
 import com.novaleap.api.module.auth.support.AvatarSupport;
 import com.novaleap.api.module.auth.support.TurnstileVerifier;
-import com.novaleap.api.security.JwtUtils;
 import com.novaleap.api.service.AuthService;
-import org.springframework.beans.BeanUtils;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
@@ -32,94 +33,54 @@ public class AuthServiceImpl extends ServiceImpl<UserMapper, User> implements Au
 
     private static final String RESET_GENERIC_ERROR = "重置密码失败";
 
-    private final JwtUtils jwtUtils;
     private final AuthRateLimitSupport authRateLimitSupport;
     private final AuthPasswordSupport authPasswordSupport;
     private final AuthCheckinSupport authCheckinSupport;
     private final AvatarSupport avatarSupport;
     private final TurnstileVerifier turnstileVerifier;
     private final AuthTokenStateSupport authTokenStateSupport;
+    private final AuthRoleSupport authRoleSupport;
+    private final SharedAuthLoginService sharedAuthLoginService;
 
     public AuthServiceImpl(
-            JwtUtils jwtUtils,
             AuthRateLimitSupport authRateLimitSupport,
             AuthPasswordSupport authPasswordSupport,
             AuthCheckinSupport authCheckinSupport,
             AvatarSupport avatarSupport,
             TurnstileVerifier turnstileVerifier,
-            AuthTokenStateSupport authTokenStateSupport
+            AuthTokenStateSupport authTokenStateSupport,
+            AuthRoleSupport authRoleSupport,
+            SharedAuthLoginService sharedAuthLoginService
     ) {
-        this.jwtUtils = jwtUtils;
         this.authRateLimitSupport = authRateLimitSupport;
         this.authPasswordSupport = authPasswordSupport;
         this.authCheckinSupport = authCheckinSupport;
         this.avatarSupport = avatarSupport;
         this.turnstileVerifier = turnstileVerifier;
         this.authTokenStateSupport = authTokenStateSupport;
-    }
-
-    @Override
-    public Map<String, Object> login(String username, String password, String ip, String turnstileToken) {
-        String input = normalizeUsernameInput(username);
-        String passwordValue = authPasswordSupport.safeTrim(password);
-        if (!StringUtils.hasText(input) || !StringUtils.hasText(passwordValue)) {
-            throw new IllegalArgumentException("账号和密码不能为空");
-        }
-
-        String usernameLookup = normalizeUsernameLookup(input);
-        String ipKey = authRateLimitSupport.normalizeClientIp(ip);
-        authRateLimitSupport.checkLoginRateLimit(ipKey);
-        if (!"admin".equalsIgnoreCase(usernameLookup) && authRateLimitSupport.isLoginLocked(ipKey, usernameLookup)) {
-            throw new IllegalArgumentException("登录失败次数过多，请稍后再试");
-        }
-
-        turnstileVerifier.verifyIfEnabled(turnstileToken, ip);
-
-        User user = findUserByLookupValue(usernameLookup);
-        if (user == null) {
-            authRateLimitSupport.recordLoginFailure(ipKey, usernameLookup);
-            throw new IllegalArgumentException("账号或密码错误");
-        }
-
-        boolean passwordOk = authPasswordSupport.verifyPasswordAndMigrateIfLegacy(passwordValue, user, this::updateById);
-        if (!passwordOk) {
-            authRateLimitSupport.recordLoginFailure(ipKey, usernameLookup);
-            throw new IllegalArgumentException("账号或密码错误");
-        }
-
-        authRateLimitSupport.clearLoginFailures(ipKey, usernameLookup);
-        return buildAuthResult(user, true);
-    }
-
-    @Override
-    public Map<String, Object> loginByEmailCode(String username, String ip, String turnstileToken) {
-        String input = normalizeUsernameInput(username);
-        if (!StringUtils.hasText(input)) {
-            throw new IllegalArgumentException("邮箱不能为空");
-        }
-
-        String usernameLookup = normalizeUsernameLookup(input);
-        String ipKey = authRateLimitSupport.normalizeClientIp(ip);
-        authRateLimitSupport.checkLoginRateLimit(ipKey);
-        turnstileVerifier.verifyIfEnabled(turnstileToken, ip);
-
-        User user = findUserByLookupValue(usernameLookup);
-        if (user == null) {
-            throw new IllegalArgumentException("该邮箱尚未注册");
-        }
-        return buildAuthResult(user, true);
+        this.authRoleSupport = authRoleSupport;
+        this.sharedAuthLoginService = sharedAuthLoginService;
     }
 
     @Override
     public Map<String, Object> guestLogin() {
-        String guestName = "guest-" + UUID.randomUUID();
+        String guestName = "guest_" + UUID.randomUUID();
         User guest = new User();
         guest.setId(-1L);
         guest.setUsername(guestName);
         guest.setNickname(guestName);
         guest.setRole("GUEST");
         guest.setCreatedAt(LocalDateTime.now());
-        return buildAuthResult(guest, false);
+        return sharedAuthLoginService.buildAuthResult(guest, false, AuthPortal.CLIENT);
+    }
+
+    @Override
+    public void logout(String username) {
+        String normalizedUsername = normalizeUsernameInput(username);
+        if (!StringUtils.hasText(normalizedUsername)) {
+            return;
+        }
+        authTokenStateSupport.invalidateUserTokens(normalizedUsername);
     }
 
     @Override
@@ -173,7 +134,7 @@ public class AuthServiceImpl extends ServiceImpl<UserMapper, User> implements Au
         } catch (DataIntegrityViolationException e) {
             throw new IllegalArgumentException("该邮箱已注册");
         }
-        return buildAuthResult(user, true);
+        return sharedAuthLoginService.buildAuthResult(user, true, AuthPortal.CLIENT);
     }
 
     @Override
@@ -279,23 +240,6 @@ public class AuthServiceImpl extends ServiceImpl<UserMapper, User> implements Au
                 .last("LIMIT 1"));
     }
 
-    private Map<String, Object> buildAuthResult(User user, boolean markLoginCheckin) {
-        String role = StringUtils.hasText(user.getRole()) ? user.getRole() : "USER";
-        String token = jwtUtils.generateToken(user.getUsername(), role);
-        User safeUser = buildSafeUser(user, role);
-        Map<String, Object> checkin = authCheckinSupport.resolveCheckinPayload(
-                user.getId(),
-                markLoginCheckin && !"GUEST".equalsIgnoreCase(role)
-        );
-
-        Map<String, Object> result = new HashMap<>();
-        result.put("token", token);
-        result.put("user", safeUser);
-        result.put("avatar", avatarSupport.resolveAvatar(user.getUsername()));
-        result.put("checkin", checkin);
-        return result;
-    }
-
     private User getUserByUsernameOrThrow(String username) {
         User user = getOne(new LambdaQueryWrapper<User>().eq(User::getUsername, username));
         if (user == null) {
@@ -306,14 +250,17 @@ public class AuthServiceImpl extends ServiceImpl<UserMapper, User> implements Au
 
     private User buildSafeUser(User user, String role) {
         User safeUser = new User();
-        BeanUtils.copyProperties(user, safeUser);
+        safeUser.setId(user.getId());
+        safeUser.setUsername(user.getUsername());
+        safeUser.setNickname(user.getNickname());
+        safeUser.setCreatedAt(user.getCreatedAt());
         safeUser.setPassword(null);
         safeUser.setRole(role);
         return safeUser;
     }
 
     private Map<String, Object> buildProfilePayload(User user) {
-        String role = StringUtils.hasText(user.getRole()) ? user.getRole() : "USER";
+        String role = authRoleSupport.normalizeRole(user.getRole());
         User safeUser = buildSafeUser(user, role);
 
         Map<String, Object> data = new HashMap<>();
@@ -347,4 +294,5 @@ public class AuthServiceImpl extends ServiceImpl<UserMapper, User> implements Au
     private String normalizeUsernameLookup(String username) {
         return normalizeUsernameInput(username).toLowerCase(Locale.ROOT);
     }
+
 }

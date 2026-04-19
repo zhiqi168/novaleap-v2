@@ -81,9 +81,18 @@ public class WishServiceImpl extends ServiceImpl<WishMapper, Wish> implements Wi
         if (wishId == null) {
             return;
         }
+        String wishIdStr = String.valueOf(wishId);
         try {
-            redisTemplate.opsForList().rightPush(WishQueueConstants.PENDING_QUEUE, String.valueOf(wishId));
+            Long added = redisTemplate.opsForSet().add(WishQueueConstants.PENDING_INDEX_SET, wishIdStr);
+            if (added == null || added <= 0) {
+                return;
+            }
+            Long pushed = redisTemplate.opsForList().rightPush(WishQueueConstants.PENDING_QUEUE, wishIdStr);
+            if (pushed == null) {
+                redisTemplate.opsForSet().remove(WishQueueConstants.PENDING_INDEX_SET, wishIdStr);
+            }
         } catch (Exception e) {
+            redisTemplate.opsForSet().remove(WishQueueConstants.PENDING_INDEX_SET, wishIdStr);
             log.error("enqueue pending wish failed, wishId={}", wishId, e);
         }
     }

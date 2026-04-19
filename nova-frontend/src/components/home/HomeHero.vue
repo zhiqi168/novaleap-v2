@@ -3,7 +3,7 @@
     <div class="hero-copy">
       <p class="hero-eyebrow">{{ eyebrow }}</p>
 
-      <h1 class="hero-title">{{ title }}</h1>
+      <h1 class="hero-title" :data-text="title">{{ title }}</h1>
 
       <p class="hero-subtitle">{{ subtitle }}</p>
 
@@ -114,25 +114,42 @@ defineEmits(['primary', 'secondary'])
   margin-top: 22px;
   margin-bottom: 10px;
   display: inline-block;
+  position: relative;
+  overflow: hidden;
   font-size: clamp(72px, 15.5vw, 178px);
   line-height: 1.12;
   font-weight: 800;
   letter-spacing: -0.08em;
-  color: transparent;
-  background-image: 
-    linear-gradient(110deg, transparent 40%, rgba(255, 255, 255, 0.45) 49%, rgba(255, 255, 255, 0.45) 51%, transparent 60%),
-    linear-gradient(180deg, #272235 0%, #1a1624 100%);
-  background-size: 280% 100%, 100% 100%;
-  background-position: -140% 0, 0 0;
-  -webkit-background-clip: text;
-  background-clip: text;
-  text-shadow: 0 0 42px rgba(39, 34, 53, 0.04);
+  color: #000000;
+  text-shadow: 0 0 24px rgba(17, 17, 17, 0.06);
   padding-bottom: 0.12em;
   padding-right: 0.05em;
   text-rendering: geometricPrecision;
-  animation: 
-    logoShimmer 5s infinite linear,
-    heroIn 820ms cubic-bezier(0.22, 1, 0.36, 1) 120ms forwards;
+  animation: heroIn 820ms cubic-bezier(0.22, 1, 0.36, 1) 120ms forwards;
+}
+
+.hero-title::after {
+  content: attr(data-text);
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  color: transparent;
+  -webkit-text-fill-color: transparent;
+  background: linear-gradient(
+    110deg,
+    transparent 40%,
+    rgba(255, 255, 255, 0.52) 42%,
+    rgba(255, 255, 255, 0.88) 50%,
+    rgba(255, 255, 255, 0.52) 58%,
+    transparent 60%
+  );
+  background-size: 200% 100%;
+  background-repeat: no-repeat;
+  -webkit-background-clip: text;
+  background-clip: text;
+  pointer-events: none;
+  animation: logoSweep 5s cubic-bezier(0.25, 1, 0.5, 1) infinite;
 }
 
 .hero-subtitle {
@@ -263,6 +280,16 @@ defineEmits(['primary', 'secondary'])
   }
 }
 
+@keyframes logoSweep {
+  0% {
+    background-position: 200% 0;
+  }
+
+  100% {
+    background-position: -100% 0;
+  }
+}
+
 .dark .hero-chip,
 .dark .hero-btn-secondary {
   background: var(--bg-soft);
@@ -270,17 +297,8 @@ defineEmits(['primary', 'secondary'])
 }
 
 .dark .hero-title {
-  background-image: 
-    linear-gradient(110deg, transparent 40%, rgba(255, 255, 255, 0.16) 49%, rgba(255, 255, 255, 0.16) 51%, transparent 60%),
-    linear-gradient(180deg, #e4c97a 0%, #cda24a 100%);
-  background-size: 280% 100%, 100% 100%;
-  background-position: -140% 0, 0 0;
+  color: #e4c97a;
   text-shadow: 0 0 34px rgba(212, 171, 84, 0.2);
-}
-
-@keyframes logoShimmer {
-  0% { background-position: -140% 0, 0 0; }
-  100% { background-position: 140% 0, 0 0; }
 }
 
 @media (max-width: 640px) {

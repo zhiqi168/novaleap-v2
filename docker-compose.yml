@@ -1,88 +1,153 @@
+name: novaleap
+
 services:
   nova-mysql:
     image: mysql:8.0
-    container_name: nova-mysql
-    restart: always
+    restart: unless-stopped
+    command:
+      - --default-authentication-plugin=mysql_native_password
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_unicode_ci
+      - --skip-name-resolve
     environment:
-      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-novaleap_dev_password}
-      MYSQL_DATABASE: ${MYSQL_DATABASE:-novaleap}
       TZ: ${TZ:-Asia/Shanghai}
-    command: --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?MYSQL_ROOT_PASSWORD is required}
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-novaleap}
+      MYSQL_USER: ${MYSQL_USER:-novaleap}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:?MYSQL_PASSWORD is required}
     ports:
-      - "3306:3306"
+      - "${DATA_BIND_IP:-127.0.0.1}:${MYSQL_PORT:-3306}:3306"
     volumes:
       - ./mysql-data:/var/lib/mysql
-      # 挂载建表脚本，容器首次初始化会自动执行
-      - ./nova-backend/init.sql:/docker-entrypoint-initdb.d/init.sql
+      - ./nova-backend/novaleap_full.sql:/docker-entrypoint-initdb.d/00-novaleap_full.sql:ro
     networks:
       - nova-net
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h localhost -uroot -p$${MYSQL_ROOT_PASSWORD} --silent"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 25s
 
   nova-redis:
-    image: redis:7.0-alpine
-    container_name: nova-redis
-    restart: always
+    image: redis:7.2-alpine
+    restart: unless-stopped
+    environment:
+      TZ: ${TZ:-Asia/Shanghai}
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-}
+    command:
+      - sh
+      - -c
+      - exec redis-server --appendonly yes --save 60 1000 $${REDIS_PASSWORD:+--requirepass "$${REDIS_PASSWORD}"}
     ports:
-      - "6379:6379"
+      - "${DATA_BIND_IP:-127.0.0.1}:${REDIS_PORT:-6379}:6379"
     volumes:
       - ./redis-data:/data
-    command: redis-server --appendonly yes
     networks:
       - nova-net
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "if [ -n \"$${REDIS_PASSWORD}\" ]; then redis-cli -a \"$${REDIS_PASSWORD}\" ping; else redis-cli ping; fi",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
 
   nova-backend:
-    build: 
+    build:
       context: ./nova-backend
       dockerfile: Dockerfile
-    container_name: nova-backend
-    restart: always
+    restart: unless-stopped
     depends_on:
-      - nova-mysql
-      - nova-redis
+      nova-mysql:
+        condition: service_healthy
+      nova-redis:
+        condition: service_healthy
     environment:
-      # 覆盖 application.yml 里的连接配置为内部网络 DNS
-      - SPRING_PROFILES_ACTIVE=${SPRING_PROFILES_ACTIVE:-prod}
-      - SERVER_PORT=8080
-      - SPRING_DATASOURCE_URL=jdbc:mysql://nova-mysql:3306/${MYSQL_DATABASE:-novaleap}?useUnicode=true&characterEncoding=utf-8&useSSL=false&serverTimezone=Asia/Shanghai
-      - SPRING_DATASOURCE_USERNAME=${SPRING_DATASOURCE_USERNAME:-root}
-      - SPRING_DATASOURCE_PASSWORD=${SPRING_DATASOURCE_PASSWORD:-novaleap_dev_password}
-      - SPRING_DATA_REDIS_HOST=nova-redis
-      - SPRING_DATA_REDIS_PORT=6379
-      - SPRING_AI_OPENAI_API_KEY=${SPRING_AI_OPENAI_API_KEY:-sk-disabled-placeholder}
-      - SPRING_AI_OPENAI_BASE_URL=${SPRING_AI_OPENAI_BASE_URL:-https://api.longcat.chat/openai}
-      - LONGCAT_MODEL=${LONGCAT_MODEL:-LongCat-Flash-Chat}
-      - LONGCAT_MODEL_FALLBACK=${LONGCAT_MODEL_FALLBACK:-LongCat-Flash-Lite}
-      - NOVA_JWT_SECRET=${NOVA_JWT_SECRET:-change-this-before-prod}
-      - SPRING_SQL_INIT_MODE=${SPRING_SQL_INIT_MODE:-never}
+      TZ: ${TZ:-Asia/Shanghai}
+      SERVER_PORT: 8080
+      SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-prod}
+      SPRING_DATASOURCE_URL: jdbc:mysql://nova-mysql:3306/${MYSQL_DATABASE:-novaleap}?useUnicode=true&characterEncoding=utf-8&useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=Asia/Shanghai
+      SPRING_DATASOURCE_USERNAME: ${SPRING_DATASOURCE_USERNAME:-novaleap}
+      SPRING_DATASOURCE_PASSWORD: ${SPRING_DATASOURCE_PASSWORD:?SPRING_DATASOURCE_PASSWORD is required}
+      SPRING_DATA_REDIS_HOST: nova-redis
+      SPRING_DATA_REDIS_PORT: 6379
+      SPRING_DATA_REDIS_PASSWORD: ${SPRING_DATA_REDIS_PASSWORD:-}
+      SPRING_AI_OPENAI_API_KEY: ${SPRING_AI_OPENAI_API_KEY:?SPRING_AI_OPENAI_API_KEY is required}
+      SPRING_AI_OPENAI_BASE_URL: ${SPRING_AI_OPENAI_BASE_URL:-https://api.longcat.chat/openai}
+      SPRING_AI_OPENAI_MAX_TOKENS: ${SPRING_AI_OPENAI_MAX_TOKENS:-10000000}
+      LONGCAT_MODEL: ${LONGCAT_MODEL:-LongCat-Flash-Chat}
+      LONGCAT_MODEL_FALLBACK: ${LONGCAT_MODEL_FALLBACK:-LongCat-Flash-Lite}
+      NOVA_AI_QUOTA_DAILY_TOKEN_LIMIT: ${NOVA_AI_QUOTA_DAILY_TOKEN_LIMIT:-10000000}
+      NOVA_AI_QUOTA_WARNING_RATIO: ${NOVA_AI_QUOTA_WARNING_RATIO:-0.70}
+      NOVA_AI_QUOTA_PROTECT_RATIO: ${NOVA_AI_QUOTA_PROTECT_RATIO:-0.85}
+      NOVA_AI_QUOTA_LIMIT_RATIO: ${NOVA_AI_QUOTA_LIMIT_RATIO:-0.95}
+      NOVA_AI_QUOTA_PER_MODEL_TOKEN_LIMIT: ${NOVA_AI_QUOTA_PER_MODEL_TOKEN_LIMIT:-5000000}
+      NOVA_AI_QUOTA_MODEL_USAGE_TTL_DAYS: ${NOVA_AI_QUOTA_MODEL_USAGE_TTL_DAYS:-2}
+      NOVA_AI_GATEWAY_TIMEOUT_MS: ${NOVA_AI_GATEWAY_TIMEOUT_MS:-15000}
+      NOVA_AI_GATEWAY_MAX_RETRY_ATTEMPTS: ${NOVA_AI_GATEWAY_MAX_RETRY_ATTEMPTS:-2}
+      NOVA_AI_GATEWAY_RETRY_BACKOFF_MS: ${NOVA_AI_GATEWAY_RETRY_BACKOFF_MS:-350}
+      NOVA_AI_GATEWAY_CIRCUIT_WINDOW_SECONDS: ${NOVA_AI_GATEWAY_CIRCUIT_WINDOW_SECONDS:-120}
+      NOVA_AI_GATEWAY_CIRCUIT_FAILURE_THRESHOLD: ${NOVA_AI_GATEWAY_CIRCUIT_FAILURE_THRESHOLD:-5}
+      NOVA_AI_GATEWAY_CIRCUIT_OPEN_SECONDS: ${NOVA_AI_GATEWAY_CIRCUIT_OPEN_SECONDS:-90}
+      NOVA_AI_GATEWAY_MIN_RESPONSE_TOKENS: ${NOVA_AI_GATEWAY_MIN_RESPONSE_TOKENS:-128}
+      NOVA_JWT_SECRET: ${NOVA_JWT_SECRET:?NOVA_JWT_SECRET is required}
+      NOVA_RESEND_API_KEY: ${NOVA_RESEND_API_KEY:-}
+      NOVA_RESEND_FROM: ${NOVA_RESEND_FROM:-}
+      NOVA_TURNSTILE_ENABLED: ${NOVA_TURNSTILE_ENABLED:-false}
+      NOVA_TURNSTILE_SECRET: ${NOVA_TURNSTILE_SECRET:-}
+      JAVA_TOOL_OPTIONS: ${JAVA_TOOL_OPTIONS:--Xms128m -Xmx384m -XX:+UseG1GC}
     ports:
-      - "8080:8080"
+      - "${BACKEND_BIND_IP:-127.0.0.1}:${BACKEND_PORT:-8080}:8080"
     networks:
       - nova-net
+    healthcheck:
+      test: ["CMD-SHELL", "nc -z localhost 8080 || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
 
   nova-frontend:
     build:
       context: ./nova-frontend
       dockerfile: Dockerfile
-    container_name: nova-frontend
-    restart: always
+    restart: unless-stopped
     depends_on:
-      - nova-backend
+      nova-backend:
+        condition: service_healthy
     ports:
-      - "80:80"
+      - "${FRONTEND_BIND_IP:-0.0.0.0}:${FRONTEND_PORT:-80}:80"
     networks:
       - nova-net
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1/ > /dev/null || exit 1"]
+      interval: 20s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
 
   nova-admin:
     build:
       context: ./nova-admin
       dockerfile: Dockerfile
-    container_name: nova-admin
-    restart: always
+    restart: unless-stopped
     depends_on:
-      - nova-backend
+      nova-backend:
+        condition: service_healthy
     ports:
-      - "8081:80"
+      - "${ADMIN_BIND_IP:-0.0.0.0}:${ADMIN_PORT:-8081}:80"
     networks:
       - nova-net
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1/ > /dev/null || exit 1"]
+      interval: 20s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
 
 networks:
   nova-net:

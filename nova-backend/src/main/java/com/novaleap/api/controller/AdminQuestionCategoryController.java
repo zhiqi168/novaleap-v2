@@ -6,6 +6,8 @@ import com.novaleap.api.module.admin.question.service.AdminQuestionApplicationSe
 import com.novaleap.api.module.admin.question.vo.AdminQuestionCategoryVO;
 import jakarta.validation.Valid;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -33,5 +35,11 @@ public class AdminQuestionCategoryController {
             @RequestBody @Valid AdminQuestionCategoryCreateRequest request
     ) {
         return Result.success(adminQuestionApplicationService.createQuestionCategory(request));
+    }
+
+    @DeleteMapping("/{code}")
+    public Result<Void> deleteQuestionCategory(@PathVariable("code") String code) {
+        adminQuestionApplicationService.deleteQuestionCategory(code);
+        return Result.success();
     }
 }

@@ -58,7 +58,8 @@ public class AiIdentitySupport {
             return "GUEST";
         }
         String value = username.trim();
-        if (value.startsWith("guest_") || value.startsWith("游客")) {
+        String lower = value.toLowerCase();
+        if (lower.startsWith("guest_") || lower.startsWith("guest-") || value.startsWith("游客")) {
             return "GUEST";
         }
         if (IPV4_PATTERN.matcher(value).matches() || value.contains(":")) {

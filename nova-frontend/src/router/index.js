@@ -1,6 +1,8 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import { reportVisit } from '@/services/analytics'
 
+const readAuthStorage = (key) => sessionStorage.getItem(key) || localStorage.getItem(key)
+
 const routes = [
   {
     path: '/login',
@@ -47,13 +49,13 @@ const routes = [
         path: 'questions',
         name: 'QuestionBank',
         component: () => import('@/views/QuestionBank.vue'),
-        meta: { title: '题库 - NovaLeap' },
+        meta: { title: '拾光题库 - NovaLeap' },
       },
       {
         path: 'notes',
         name: 'Notes',
         component: () => import('@/views/Notes.vue'),
-        meta: { title: '笔记 - NovaLeap' },
+        meta: { title: '灵感手记 - NovaLeap' },
       },
       {
         path: 'resume',
@@ -65,13 +67,13 @@ const routes = [
         path: 'coach',
         name: 'Coach',
         component: () => import('@/views/Coach.vue'),
-        meta: { title: 'AI 陪练 - NovaLeap' },
+        meta: { title: '知跃陪练 - NovaLeap' },
       },
       {
         path: 'wishes',
         name: 'WishWall',
         component: () => import('@/views/WishWall.vue'),
-        meta: { title: '愿望墙 - NovaLeap' },
+        meta: { title: '星愿墙 - NovaLeap' },
       },
       {
         path: 'game',
@@ -107,11 +109,11 @@ const router = createRouter({
 })
 
 router.beforeEach((to, from, next) => {
-  const token = localStorage.getItem('nova_token')
+  const token = readAuthStorage('nova_token')
   let isGuest = false
 
   try {
-    const user = JSON.parse(localStorage.getItem('nova_user') || 'null')
+    const user = JSON.parse(readAuthStorage('nova_user') || 'null')
     isGuest = user?.role === 'GUEST'
   } catch (_) {
     isGuest = false

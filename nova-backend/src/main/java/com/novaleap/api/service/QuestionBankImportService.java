@@ -2,6 +2,7 @@ package com.novaleap.api.service;
 
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
@@ -14,6 +15,8 @@ import java.util.Set;
 @Service
 public class QuestionBankImportService {
 
+    private static final String CONTENT_TYPE_TEXT = "text/plain";
+    private static final String CONTENT_TYPE_OCTET = "application/octet-stream";
     private static final Set<String> SUPPORTED_TYPES = Set.of("txt");
 
     public record QuestionDraft(String title, String content, String standardAnswer) {
@@ -27,6 +30,22 @@ public class QuestionBankImportService {
         String rawText = extractText(fileType, fileBytes);
         List<QuestionDraft> questions = parseQuestions(rawText);
         return new ImportPayload(fileType, rawText, questions);
+    }
+
+    public void validateImportFile(MultipartFile file, long maxFileSize) {
+        if (file == null || file.isEmpty()) {
+            throw new IllegalArgumentException("璇烽€夋嫨棰樺簱鏂囦欢");
+        }
+        if (file.getSize() > maxFileSize) {
+            throw new IllegalArgumentException("鏂囦欢澶у皬涓嶈兘瓒呰繃 5MB");
+        }
+        detectFileType(file.getOriginalFilename());
+        String contentType = safe(file.getContentType()).toLowerCase(Locale.ROOT);
+        if (StringUtils.hasText(contentType)
+                && !CONTENT_TYPE_TEXT.equals(contentType)
+                && !CONTENT_TYPE_OCTET.equals(contentType)) {
+            throw new IllegalArgumentException("浠呮敮鎸?txt 鏍煎紡鏂囦欢");
+        }
     }
 
     /**
@@ -133,5 +152,9 @@ public class QuestionBankImportService {
                 .replace('\r', '\n')
                 .replaceAll("\\n{3,}", "\n\n")
                 .trim();
+    }
+
+    private String safe(String value) {
+        return value == null ? "" : value.trim();
     }
 }

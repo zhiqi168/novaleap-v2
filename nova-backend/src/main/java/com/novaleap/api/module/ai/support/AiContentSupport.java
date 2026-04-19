@@ -18,6 +18,7 @@ public class AiContentSupport {
     private static final int MAX_REJECT_REASON_LENGTH = 240;
     private static final int MAX_SUMMARY_POINT_LENGTH = 60;
     private static final int MIN_SUMMARY_POINT_LENGTH = 12;
+
     private static final Set<String> NOTE_BANNED_WORDS = Set.of(
             "吸毒", "毒品", "贩毒", "涉毒",
             "赌博", "博彩", "赌钱", "网赌",
@@ -27,6 +28,7 @@ public class AiContentSupport {
             "色情", "约炮", "成人视频", "嫖娼",
             "草泥马", "你妈", "傻逼", "操你妈"
     );
+
     private static final Set<String> FORBIDDEN_IDENTITY_TERMS = Set.of(
             "longcat", "美团", "openai", "chatgpt", "gpt", "claude", "anthropic"
     );
@@ -64,7 +66,7 @@ public class AiContentSupport {
             boolean approved = node.path("approved").asBoolean(false);
             String reason = clipReason(safe(node.path("reason").asText("")));
             if (approved) {
-                return new AiService.NoteModerationResult(true, reason.isBlank() ? "AI审核通过" : reason, "AI");
+                return new AiService.NoteModerationResult(true, reason.isBlank() ? "AI 审核通过" : reason, "AI");
             }
             return new AiService.NoteModerationResult(false, reason.isBlank() ? "命中违规内容" : reason, "AI");
         } catch (Exception e) {

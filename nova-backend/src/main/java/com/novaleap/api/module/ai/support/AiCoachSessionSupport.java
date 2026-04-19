@@ -6,6 +6,7 @@ import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 
+import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -21,6 +22,7 @@ public class AiCoachSessionSupport {
     private static final String KEY_COACH_ACTIVE_SESSION_PREFIX = "nova:ai:coach:active_session:";
     private static final String LEGACY_SESSION_ID = "legacy";
     private static final int MAX_HISTORY_LENGTH = 120;
+    private static final Duration SESSION_TTL = Duration.ofDays(14);
 
     private final StringRedisTemplate redisTemplate;
     private final ObjectMapper objectMapper;
@@ -66,7 +68,7 @@ public class AiCoachSessionSupport {
             return "";
         }
         String sessionId = newCoachSessionId();
-        redisTemplate.opsForValue().set(activeSessionKey(username), sessionId);
+        redisTemplate.opsForValue().set(activeSessionKey(username), sessionId, SESSION_TTL);
         return sessionId;
     }
 
@@ -95,6 +97,8 @@ public class AiCoachSessionSupport {
             String key = historyKey(username);
             redisTemplate.opsForList().leftPush(key, objectMapper.writeValueAsString(row));
             redisTemplate.opsForList().trim(key, 0, MAX_HISTORY_LENGTH - 1);
+            redisTemplate.expire(key, SESSION_TTL);
+            redisTemplate.expire(activeSessionKey(username), SESSION_TTL);
         } catch (Exception e) {
             log.debug("save coach history failed: {}", e.getMessage());
         }
@@ -131,6 +135,8 @@ public class AiCoachSessionSupport {
         String sessionKey = activeSessionKey(username);
         String existing = safe(redisTemplate.opsForValue().get(sessionKey));
         if (StringUtils.hasText(existing)) {
+            redisTemplate.expire(sessionKey, SESSION_TTL);
+            redisTemplate.expire(historyKey(username), SESSION_TTL);
             return existing;
         }
 
@@ -149,7 +155,8 @@ public class AiCoachSessionSupport {
             resolved = newCoachSessionId();
         }
 
-        redisTemplate.opsForValue().set(sessionKey, resolved);
+        redisTemplate.opsForValue().set(sessionKey, resolved, SESSION_TTL);
+        redisTemplate.expire(historyKey(username), SESSION_TTL);
         return resolved;
     }
 

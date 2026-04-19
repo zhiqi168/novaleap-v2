@@ -1,9 +1,9 @@
 spring:
   datasource:
     driver-class-name: com.mysql.cj.jdbc.Driver
-    url: ${SPRING_DATASOURCE_URL:jdbc:mysql://localhost:3306/novaleap?useUnicode=true&characterEncoding=utf-8&useSSL=false&serverTimezone=Asia/Shanghai}
+    url: ${SPRING_DATASOURCE_URL:jdbc:mysql://localhost:3306/novaleap?useUnicode=true&characterEncoding=utf-8&useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=Asia/Shanghai}
     username: ${SPRING_DATASOURCE_USERNAME:root}
-    password: ${SPRING_DATASOURCE_PASSWORD:root}
+    password: ${SPRING_DATASOURCE_PASSWORD:123456}
   data:
     redis:
       host: ${SPRING_DATA_REDIS_HOST:localhost}
@@ -19,7 +19,7 @@ spring:
           model: ${LONGCAT_MODEL:LongCat-Flash-Chat}
       usage:
         enabled: true
-        max-tokens: 500000
+        max-tokens: ${SPRING_AI_OPENAI_MAX_TOKENS:10000000}
         fallback-model: ${LONGCAT_MODEL_FALLBACK:LongCat-Flash-Lite}
   sql:
     init:
@@ -36,4 +36,4 @@ nova:
     username-guard:
       enabled: ${NOVA_STARTUP_USERNAME_GUARD_ENABLED:true}
   jwt:
-    secret: ${NOVA_JWT_SECRET:NovaLeap7SecretKeyNovaLeap7SecretKeyNovaLeap7SecretKeyNovaLeap7SecretKey}
+    secret: ${NOVA_JWT_SECRET:replace-with-a-strong-dev-secret}

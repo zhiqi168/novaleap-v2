@@ -8,7 +8,7 @@
           <img src="@/assets/logo.png" alt="logo" class="h-7 w-auto object-contain" />
           <div class="hidden min-w-0 text-left sm:block">
             <p class="text-sm font-semibold tracking-[-0.02em] text-text-primary">NovaLeap</p>
-            <p class="text-[11px] text-text-tertiary">知跃</p>
+            <p class="text-[11px] text-[#f89aa5]">知跃</p>
           </div>
         </button>
 
@@ -307,10 +307,17 @@ onBeforeUnmount(() => {
 .app-layout {
   position: relative;
   isolation: isolate;
-  height: 100vh;
+  min-height: 100vh;
+  height: 100dvh;
   width: 100%;
   overflow: hidden;
   background: var(--app-shell-bg);
+}
+
+@supports (height: 100svh) {
+  .app-layout {
+    min-height: 100svh;
+  }
 }
 
 .app-atmosphere {
@@ -575,7 +582,7 @@ onBeforeUnmount(() => {
 }
 
 .app-header-spacer {
-  height: 76px;
+  height: 91px;
   flex-shrink: 0;
 }
 
@@ -627,7 +634,7 @@ onBeforeUnmount(() => {
   }
 
   .app-header-spacer {
-    height: 66px;
+    height: 84px;
   }
 
   .app-content {

@@ -96,11 +96,11 @@ defineProps({
 .status-mini-card {
   position: relative;
   overflow: hidden;
-  border-radius: 30px;
+  border-radius: var(--radius-xl);
   border: 1px solid var(--border-soft);
   background: var(--surface-panel);
-  backdrop-filter: blur(18px);
-  box-shadow: 0 20px 54px rgba(21, 19, 40, 0.08);
+  backdrop-filter: blur(8px);
+  box-shadow: var(--shadow-base);
   transition: transform 0.35s ease, box-shadow 0.35s ease, border-color 0.35s ease;
 }
 
@@ -116,7 +116,7 @@ defineProps({
 .status-main-card:hover,
 .status-mini-card:hover {
   transform: translateY(-6px) scale(1.01);
-  box-shadow: 0 28px 72px rgba(var(--primary-rgb), 0.14);
+  box-shadow: var(--shadow-hover);
   border-color: var(--accent-border);
 }
 
@@ -129,23 +129,23 @@ defineProps({
   height: 180px;
   border-radius: 999px;
   background: color-mix(in srgb, var(--accent-soft) 88%, white 12%);
-  filter: blur(56px);
+  filter: blur(24px);
 }
 
 .task-chip {
   position: relative;
   z-index: 1;
-  border-radius: 22px;
+  border-radius: var(--radius-lg);
   border: 1px solid var(--border-soft);
   background: var(--surface-panel-soft);
   padding: 14px;
-  backdrop-filter: blur(14px);
+  backdrop-filter: blur(8px);
   transition: transform 0.26s ease, box-shadow 0.26s ease;
 }
 
 .task-chip:hover {
   transform: translateY(-3px);
-  box-shadow: 0 18px 32px rgba(var(--primary-rgb), 0.12);
+  box-shadow: var(--shadow-hover);
 }
 
 .task-icon {
@@ -160,10 +160,10 @@ defineProps({
 }
 
 .status-progress-badge {
-  border-radius: 22px;
+  border-radius: var(--radius-lg);
   border: 1px solid var(--border-soft);
   background: var(--surface-panel-soft);
-  backdrop-filter: blur(18px);
+  backdrop-filter: blur(8px);
 }
 
 @keyframes statusFloat {

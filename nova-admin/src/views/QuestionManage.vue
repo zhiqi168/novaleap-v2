@@ -60,6 +60,50 @@
       </button>
     </div>
 
+    <div class="bg-admin-card rounded-lg p-4 shadow-sm border border-gray-100">
+      <div class="flex items-center justify-between gap-3 mb-3">
+        <div>
+          <h3 class="text-sm font-semibold text-admin-text">分类管理</h3>
+          <p class="text-xs text-admin-muted mt-1">内置分类不可删除；已被题目或题库占用的分类也不能删除。</p>
+        </div>
+        <span class="text-xs text-admin-muted">{{ normalizedCategoryOptions.length }} 个分类</span>
+      </div>
+      <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
+        <div
+          v-for="item in normalizedCategoryOptions"
+          :key="`category-card-${item.code}`"
+          class="rounded-lg border border-gray-100 bg-gray-50 px-3 py-3 flex items-start justify-between gap-3"
+        >
+          <div class="min-w-0">
+            <div class="flex items-center gap-2 flex-wrap">
+              <span class="text-sm font-medium text-admin-text">{{ item.name }}</span>
+              <span class="px-2 py-0.5 rounded-full text-[11px] bg-white border border-gray-200 text-admin-muted">
+                {{ item.code }}
+              </span>
+              <span
+                v-if="item.builtin"
+                class="px-2 py-0.5 rounded-full text-[11px] bg-slate-100 text-slate-600"
+              >
+                内置
+              </span>
+            </div>
+            <p class="mt-2 text-xs text-admin-muted">{{ categoryUsageText(item) }}</p>
+          </div>
+          <button
+            @click="handleDeleteCategory(item)"
+            :disabled="!item.deletable || categoryDeletingCode === item.code"
+            class="shrink-0 inline-flex items-center gap-1 px-2 py-1 text-xs rounded border transition-colors"
+            :class="item.deletable
+              ? 'border-red-200 text-admin-danger hover:bg-red-50 disabled:opacity-60'
+              : 'border-gray-200 text-gray-400 cursor-not-allowed opacity-70'"
+          >
+            <Trash2 class="w-3.5 h-3.5" />
+            {{ categoryDeletingCode === item.code ? '删除中...' : '删除' }}
+          </button>
+        </div>
+      </div>
+    </div>
+
     <div class="bg-admin-card rounded-lg shadow-sm border border-gray-100 overflow-hidden">
       <div v-if="loading" class="p-8 text-center text-admin-muted">
         <div class="w-6 h-6 border-2 border-admin-primary/30 border-t-admin-primary rounded-full animate-spin mx-auto mb-2"></div>
@@ -519,6 +563,7 @@ import {
   deleteQuestion,
   getQuestionCategoryList,
   createQuestionCategory,
+  deleteQuestionCategory,
   getCustomQuestionBankList,
   auditCustomQuestionBank,
   importOfficialQuestionBank,
@@ -552,6 +597,7 @@ const editingId = ref(null)
 const submitting = ref(false)
 const categoryDialogVisible = ref(false)
 const categorySubmitting = ref(false)
+const categoryDeletingCode = ref('')
 const officialImportDialogVisible = ref(false)
 const officialImportSubmitting = ref(false)
 const officialFileInputRef = ref(null)
@@ -634,9 +680,16 @@ const normalizedCategoryOptions = computed(() => {
   const deduped = rows
     .map((item) => {
       const code = normalizeCategoryCode(item?.code)
+      const builtin = item?.builtin ?? Boolean(defaultCategoryMap[code])
+      const questionCount = Number(item?.questionCount || 0)
+      const bankCount = Number(item?.bankCount || 0)
       return {
         code,
         name: normalizeCategoryName(code, item?.name),
+        builtin,
+        questionCount,
+        bankCount,
+        deletable: item?.deletable ?? (!builtin && questionCount === 0 && bankCount === 0),
       }
     })
     .filter((item) => item.code && item.name)
@@ -679,6 +732,10 @@ const loadCategoryOptions = async () => {
         .map((item) => ({
           code: normalizeCategoryCode(item?.code),
           name: normalizeCategoryName(item?.code, item?.name),
+          builtin: Boolean(item?.builtin),
+          questionCount: Number(item?.questionCount || 0),
+          bankCount: Number(item?.bankCount || 0),
+          deletable: Boolean(item?.deletable),
         }))
         .filter((item) => item.code && item.name)
     } else {
@@ -689,7 +746,14 @@ const loadCategoryOptions = async () => {
   }
 
   if (!categoryOptions.value.length) {
-    categoryOptions.value = Object.entries(defaultCategoryMap).map(([code, name]) => ({ code, name }))
+    categoryOptions.value = Object.entries(defaultCategoryMap).map(([code, name]) => ({
+      code,
+      name,
+      builtin: true,
+      questionCount: 0,
+      bankCount: 0,
+      deletable: false,
+    }))
   }
   if (!form.category || !normalizedCategoryOptions.value.some((item) => item.code === form.category)) {
     form.category = getDefaultCategoryCode()
@@ -708,6 +772,7 @@ const openCategoryDialog = () => {
 const closeCategoryDialog = () => {
   categoryDialogVisible.value = false
   categorySubmitting.value = false
+  categoryDeletingCode.value = ''
 }
 
 const submitCategoryDialog = async () => {
@@ -737,6 +802,52 @@ const submitCategoryDialog = async () => {
     alert(e.message || '新增分类失败')
   } finally {
     categorySubmitting.value = false
+  }
+}
+
+const categoryUsageText = (item) => {
+  const questionCount = Number(item?.questionCount || 0)
+  const bankCount = Number(item?.bankCount || 0)
+  if (questionCount > 0 || bankCount > 0) {
+    return `题目 ${questionCount} / 题库 ${bankCount}`
+  }
+  return '未被使用'
+}
+
+const handleDeleteCategory = async (item) => {
+  if (!item?.code) return
+  if (!item.deletable) {
+    if (item.builtin) {
+      alert('内置分类不允许删除')
+      return
+    }
+    alert('该分类仍被题目或题库使用，不能删除')
+    return
+  }
+  if (!confirm(`确定删除分类“${item.name}”吗？`)) return
+
+  categoryDeletingCode.value = item.code
+  try {
+    const res = await deleteQuestionCategory(item.code)
+    if (res.code !== 200) {
+      alert(res.msg || '删除分类失败')
+      return
+    }
+    if (categoryFilter.value === item.code) {
+      categoryFilter.value = ''
+    }
+    if (form.category === item.code) {
+      form.category = getDefaultCategoryCode()
+    }
+    if (officialImportForm.category === item.code) {
+      officialImportForm.category = getDefaultCategoryCode()
+    }
+    await loadCategoryOptions()
+    await loadData(1)
+  } catch (e) {
+    alert(e.message || '删除分类失败')
+  } finally {
+    categoryDeletingCode.value = ''
   }
 }
 

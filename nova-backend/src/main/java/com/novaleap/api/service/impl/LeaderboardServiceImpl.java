@@ -32,6 +32,7 @@ public class LeaderboardServiceImpl implements LeaderboardService {
     private static final String KEY_WISH_COUNT = "nova:leaderboard:wish_count";
     private static final String PROFILE_AVATAR_KEY_PREFIX = "nova:profile:avatar:";
     private static final String DEFAULT_AVATAR = "🙂";
+    private static final int ACTIVE_USER_DISPLAY_CAP = 10;
 
     private final UserMapper userMapper;
     private final QuestionMapper questionMapper;
@@ -171,7 +172,7 @@ public class LeaderboardServiceImpl implements LeaderboardService {
         }
 
         Map<String, Object> summary = new HashMap<>();
-        summary.put("activeUsers", users.size());
+        summary.put("activeUsers", Math.min(users.size(), ACTIVE_USER_DISPLAY_CAP));
         summary.put("questionDoneTotal", totalQuestionDone);
         summary.put("wishTotal", totalWishCount);
         summary.put("maxGameScore", maxGameScore);
@@ -180,6 +181,32 @@ public class LeaderboardServiceImpl implements LeaderboardService {
         data.put("summary", summary);
         data.put("list", list);
         return data;
+    }
+
+    @Override
+    public Map<String, Object> getUserSnapshot(String username) {
+        User user = findRealUser(username);
+        if (user == null || user.getId() == null) {
+            return Collections.emptyMap();
+        }
+
+        Map<Long, Long> questionDoneMap = loadQuestionDoneCountMap();
+        long dbQuestionDone = questionDoneMap.getOrDefault(user.getId(), 0L);
+        long redisQuestionDone = score(KEY_Q_COUNT, username);
+        long questionDone = Math.max(dbQuestionDone, redisQuestionDone);
+        long wishCount = score(KEY_WISH_COUNT, username);
+        int gameBest = (int) score(KEY_GAME_BEST, username);
+
+        Map<String, Object> row = new HashMap<>();
+        row.put("userId", user.getId());
+        row.put("username", username);
+        row.put("nickname", StringUtils.hasText(user.getNickname()) ? user.getNickname() : username);
+        row.put("avatar", avatarOf(username));
+        row.put("questionDone", questionDone);
+        row.put("wishCount", wishCount);
+        row.put("gameBestScore", gameBest);
+        row.put("totalScore", calcTotalScore(questionDone, wishCount, gameBest));
+        return row;
     }
 
     @Override

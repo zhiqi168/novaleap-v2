@@ -26,13 +26,13 @@
         :score-top-five="scoreTopFive"
         @step-change="handleStepChange"
       />
-
-      <HomeFooterCta
-        id="footer"
-        data-reveal
-        class="mt-4"
-      />
     </div>
+
+    <HomeFooterCta
+      id="footer"
+      data-reveal
+      class="home-footer mt-4"
+    />
 
     <button
       type="button"
@@ -290,7 +290,8 @@ const scrollToTop = () => {
 
 const handleScroll = (e) => {
   const scrollTop = e.target.scrollTop
-  showBackToTop.value = scrollTop > 600
+  const mobileThreshold = window.innerWidth <= 768 ? 320 : 600
+  showBackToTop.value = scrollTop > mobileThreshold
 }
 
 const scrollToSection = (sectionId, options = {}) => {
@@ -436,7 +437,12 @@ onUnmounted(() => {
 <style scoped>
 .home-page {
   position: relative;
+  height: 100%;
   scroll-behavior: smooth;
+  overscroll-behavior-y: contain;
+  -webkit-overflow-scrolling: touch;
+  touch-action: pan-y;
+  scroll-padding-top: 96px;
 }
 
 .page-shell {
@@ -655,6 +661,10 @@ onUnmounted(() => {
   transform: translateY(0);
 }
 
+.home-footer {
+  width: 100%;
+}
+
 @keyframes pageEnter {
   0% {
     opacity: 0;
@@ -689,28 +699,19 @@ onUnmounted(() => {
 }
 
 @media (max-width: 768px) {
-  .scroll-cue-left {
-    display: none;
+  .home-page {
+    scroll-padding-top: 82px;
   }
 
+  .page-shell {
+    padding-left: 16px;
+    padding-right: 16px;
+    padding-top: 8px;
+  }
+
+  .scroll-cue-left,
   .scroll-cue-right {
-    top: auto;
-    bottom: 96px;
-    right: 14px;
-    width: 34px;
-    height: 124px;
-  }
-
-  .scroll-cue-line {
-    width: 2px;
-    height: 84px;
-  }
-
-  .scroll-cue-head {
-    width: 20px;
-    height: 20px;
-    border-right-width: 2px;
-    border-bottom-width: 2px;
+    display: none;
   }
 
   .support-qr {
@@ -718,16 +719,12 @@ onUnmounted(() => {
     height: 210px;
   }
 
-  @keyframes arrowMove {
-    0%,
-    100% {
-      transform: translateY(0);
-      opacity: 0.72;
-    }
-    50% {
-      transform: translateY(12px);
-      opacity: 1;
-    }
+  .back-to-top {
+    right: 12px;
+    bottom: calc(12px + env(safe-area-inset-bottom));
+    width: 44px;
+    height: 44px;
+    border-radius: 12px;
   }
 }
 

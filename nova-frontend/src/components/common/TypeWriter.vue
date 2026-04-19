@@ -39,6 +39,37 @@ let currentIndex = 0
 let timer = null
 let streamSession = false
 
+const sanitizeHtml = (unsafeHtml) => {
+  const raw = String(unsafeHtml || '')
+  if (!raw) return ''
+
+  const parser = new DOMParser()
+  const doc = parser.parseFromString(raw, 'text/html')
+
+  const blockedTags = ['script', 'iframe', 'object', 'embed', 'link', 'style', 'meta']
+  blockedTags.forEach((tag) => {
+    doc.querySelectorAll(tag).forEach((node) => node.remove())
+  })
+
+  doc.querySelectorAll('*').forEach((node) => {
+    Array.from(node.attributes).forEach((attr) => {
+      const name = attr.name.toLowerCase()
+      const value = String(attr.value || '').trim().toLowerCase()
+
+      if (name.startsWith('on')) {
+        node.removeAttribute(attr.name)
+        return
+      }
+
+      if ((name === 'href' || name === 'src' || name === 'xlink:href') && value.startsWith('javascript:')) {
+        node.removeAttribute(attr.name)
+      }
+    })
+  })
+
+  return doc.body.innerHTML
+}
+
 const normalizeMarkdown = (input) => {
   const raw = String(input || '')
   if (!raw) return ''
@@ -143,12 +174,13 @@ onUnmounted(() => {
 
 const renderedHtml = computed(() => {
   if (!displayedText.value) return ''
-  return marked.parse(normalizeMarkdown(displayedText.value))
+  const html = marked.parse(normalizeMarkdown(displayedText.value))
+  return sanitizeHtml(html)
 })
 
 const formattedText = computed(() => {
   if (!displayedText.value) return ''
-  return displayedText.value.replace(/\n/g, '<br>')
+  return sanitizeHtml(displayedText.value.replace(/\n/g, '<br>'))
 })
 </script>
 

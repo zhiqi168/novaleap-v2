@@ -1,10 +1,13 @@
 package com.novaleap.api.module.admin.question.service;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.novaleap.api.common.exception.NotFoundException;
+import com.novaleap.api.entity.CustomQuestionBank;
 import com.novaleap.api.entity.Question;
 import com.novaleap.api.entity.QuestionCategory;
+import com.novaleap.api.mapper.CustomQuestionBankMapper;
 import com.novaleap.api.mapper.QuestionCategoryMapper;
 import com.novaleap.api.mapper.QuestionMapper;
 import com.novaleap.api.module.admin.question.assembler.AdminQuestionViewAssembler;
@@ -13,11 +16,14 @@ import com.novaleap.api.module.admin.question.dto.AdminQuestionSaveRequest;
 import com.novaleap.api.module.admin.question.support.AdminQuestionCategorySupport;
 import com.novaleap.api.module.admin.question.vo.AdminQuestionCategoryVO;
 import com.novaleap.api.module.admin.question.vo.AdminQuestionVO;
+import com.novaleap.api.module.system.catalog.QuestionCategoryCatalog;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 @Service
 public class AdminQuestionApplicationService {
@@ -28,13 +34,16 @@ public class AdminQuestionApplicationService {
 
     private final QuestionMapper questionMapper;
     private final QuestionCategoryMapper questionCategoryMapper;
+    private final CustomQuestionBankMapper customQuestionBankMapper;
 
     public AdminQuestionApplicationService(
             QuestionMapper questionMapper,
-            QuestionCategoryMapper questionCategoryMapper
+            QuestionCategoryMapper questionCategoryMapper,
+            CustomQuestionBankMapper customQuestionBankMapper
     ) {
         this.questionMapper = questionMapper;
         this.questionCategoryMapper = questionCategoryMapper;
+        this.customQuestionBankMapper = customQuestionBankMapper;
     }
 
     public Page<AdminQuestionVO> getQuestionList(Integer page, Integer size, String category, Integer difficulty, String keyword) {
@@ -98,7 +107,20 @@ public class AdminQuestionApplicationService {
     }
 
     public List<AdminQuestionCategoryVO> getQuestionCategoryList() {
-        return AdminQuestionCategorySupport.loadOptions(questionCategoryMapper);
+        List<AdminQuestionCategoryVO> options = AdminQuestionCategorySupport.loadOptions(questionCategoryMapper);
+        Map<String, Long> questionCountMap = loadQuestionCountByCategory();
+        Map<String, Long> bankCountMap = loadBankCountByCategory();
+        for (AdminQuestionCategoryVO option : options) {
+            String code = AdminQuestionCategorySupport.canonicalizeCategoryCode(option.getCode());
+            long questionCount = questionCountMap.getOrDefault(code, 0L);
+            long bankCount = bankCountMap.getOrDefault(code, 0L);
+            boolean builtin = QuestionCategoryCatalog.isBuiltin(code);
+            option.setBuiltin(builtin);
+            option.setQuestionCount(questionCount);
+            option.setBankCount(bankCount);
+            option.setDeletable(!builtin && questionCount == 0L && bankCount == 0L);
+        }
+        return options;
     }
 
     public AdminQuestionCategoryVO createQuestionCategory(AdminQuestionCategoryCreateRequest request) {
@@ -140,7 +162,42 @@ public class AdminQuestionApplicationService {
         AdminQuestionCategoryVO vo = new AdminQuestionCategoryVO();
         vo.setCode(category.getCode());
         vo.setName(category.getName());
+        vo.setBuiltin(false);
+        vo.setQuestionCount(0L);
+        vo.setBankCount(0L);
+        vo.setDeletable(true);
         return vo;
+    }
+
+    public void deleteQuestionCategory(String rawCode) {
+        String code = AdminQuestionCategorySupport.canonicalizeCategoryCode(rawCode);
+        if (isBlank(code)) {
+            throw new IllegalArgumentException("分类编码不能为空");
+        }
+        if (QuestionCategoryCatalog.isBuiltin(code)) {
+            throw new IllegalArgumentException("内置分类不允许删除");
+        }
+
+        LambdaQueryWrapper<QuestionCategory> categoryWrapper = new LambdaQueryWrapper<>();
+        categoryWrapper.eq(QuestionCategory::getCode, code);
+        QuestionCategory category = questionCategoryMapper.selectOne(categoryWrapper);
+        if (category == null) {
+            throw new NotFoundException("分类不存在");
+        }
+
+        long questionCount = questionMapper.selectCount(new LambdaQueryWrapper<Question>()
+                .eq(Question::getCategory, code));
+        if (questionCount > 0) {
+            throw new IllegalArgumentException("该分类下仍有题目，不能删除");
+        }
+
+        long bankCount = customQuestionBankMapper.selectCount(new LambdaQueryWrapper<CustomQuestionBank>()
+                .eq(CustomQuestionBank::getCategory, code));
+        if (bankCount > 0) {
+            throw new IllegalArgumentException("该分类下仍有关联题库，不能删除");
+        }
+
+        questionCategoryMapper.deleteById(category.getId());
     }
 
     private Question loadQuestion(Long id) {
@@ -193,6 +250,56 @@ public class AdminQuestionApplicationService {
 
     private List<AdminQuestionCategoryVO> loadCategoryOptions() {
         return AdminQuestionCategorySupport.loadOptions(questionCategoryMapper);
+    }
+
+    private Map<String, Long> loadQuestionCountByCategory() {
+        Map<String, Long> result = new HashMap<>();
+        QueryWrapper<Question> wrapper = new QueryWrapper<>();
+        wrapper.select("category AS category", "COUNT(*) AS total")
+                .isNotNull("category")
+                .groupBy("category");
+        List<Map<String, Object>> rows = questionMapper.selectMaps(wrapper);
+        for (Map<String, Object> row : rows) {
+            String code = AdminQuestionCategorySupport.canonicalizeCategoryCode(asString(row.get("category")));
+            if (!isBlank(code)) {
+                result.put(code, asLong(row.get("total")));
+            }
+        }
+        return result;
+    }
+
+    private Map<String, Long> loadBankCountByCategory() {
+        Map<String, Long> result = new HashMap<>();
+        QueryWrapper<CustomQuestionBank> wrapper = new QueryWrapper<>();
+        wrapper.select("category AS category", "COUNT(*) AS total")
+                .isNotNull("category")
+                .groupBy("category");
+        List<Map<String, Object>> rows = customQuestionBankMapper.selectMaps(wrapper);
+        for (Map<String, Object> row : rows) {
+            String code = AdminQuestionCategorySupport.canonicalizeCategoryCode(asString(row.get("category")));
+            if (!isBlank(code)) {
+                result.put(code, asLong(row.get("total")));
+            }
+        }
+        return result;
+    }
+
+    private String asString(Object value) {
+        return value == null ? "" : String.valueOf(value).trim();
+    }
+
+    private long asLong(Object value) {
+        if (value == null) {
+            return 0L;
+        }
+        if (value instanceof Number number) {
+            return number.longValue();
+        }
+        try {
+            return Long.parseLong(String.valueOf(value).trim());
+        } catch (Exception ignore) {
+            return 0L;
+        }
     }
 
     private Integer normalizeDifficulty(Integer difficulty) {

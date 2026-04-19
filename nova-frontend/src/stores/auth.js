@@ -1,11 +1,49 @@
-﻿import { defineStore } from 'pinia'
+import { defineStore } from 'pinia'
 import { computed, ref } from 'vue'
 
 const DEFAULT_AVATAR = '🥳'
+const TOKEN_KEY = 'nova_token'
+const USER_KEY = 'nova_user'
+
+const readSession = (key) => sessionStorage.getItem(key)
+const writeSession = (key, value) => sessionStorage.setItem(key, value)
+
+const clearAuthStorage = () => {
+  sessionStorage.removeItem(TOKEN_KEY)
+  sessionStorage.removeItem(USER_KEY)
+  localStorage.removeItem(TOKEN_KEY)
+  localStorage.removeItem(USER_KEY)
+}
+
+const resolveToken = () => {
+  const sessionToken = readSession(TOKEN_KEY)
+  if (sessionToken) return sessionToken
+
+  const legacyToken = localStorage.getItem(TOKEN_KEY) || ''
+  if (legacyToken) {
+    writeSession(TOKEN_KEY, legacyToken)
+    localStorage.removeItem(TOKEN_KEY)
+  }
+  return legacyToken
+}
+
+const resolveUser = () => {
+  const sessionUser = readSession(USER_KEY)
+  if (sessionUser) {
+    return JSON.parse(sessionUser || 'null')
+  }
+
+  const legacyUser = localStorage.getItem(USER_KEY) || 'null'
+  if (legacyUser && legacyUser !== 'null') {
+    writeSession(USER_KEY, legacyUser)
+    localStorage.removeItem(USER_KEY)
+  }
+  return JSON.parse(legacyUser || 'null')
+}
 
 export const useAuthStore = defineStore('auth', () => {
-  const token = ref(localStorage.getItem('nova_token') || '')
-  const user = ref(JSON.parse(localStorage.getItem('nova_user') || 'null'))
+  const token = ref(resolveToken())
+  const user = ref(resolveUser())
 
   const isLoggedIn = computed(() => !!token.value)
   const isAdmin = computed(() => user.value?.role === 'ADMIN')
@@ -16,21 +54,22 @@ export const useAuthStore = defineStore('auth', () => {
   function setAuth(tokenValue, userInfo) {
     token.value = tokenValue
     user.value = userInfo
-    localStorage.setItem('nova_token', tokenValue)
-    localStorage.setItem('nova_user', JSON.stringify(userInfo))
+    writeSession(TOKEN_KEY, tokenValue)
+    writeSession(USER_KEY, JSON.stringify(userInfo))
+    localStorage.removeItem(TOKEN_KEY)
+    localStorage.removeItem(USER_KEY)
   }
 
   function patchUser(partial) {
     const next = { ...(user.value || {}), ...(partial || {}) }
     user.value = next
-    localStorage.setItem('nova_user', JSON.stringify(next))
+    writeSession(USER_KEY, JSON.stringify(next))
   }
 
   function logout() {
     token.value = ''
     user.value = null
-    localStorage.removeItem('nova_token')
-    localStorage.removeItem('nova_user')
+    clearAuthStorage()
   }
 
   return {

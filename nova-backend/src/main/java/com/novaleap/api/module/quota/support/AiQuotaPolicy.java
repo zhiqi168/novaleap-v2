@@ -1,5 +1,6 @@
 package com.novaleap.api.module.quota.support;
 
+import com.novaleap.api.module.quota.config.AiQuotaProperties;
 import com.novaleap.api.service.AiLimitService;
 import org.springframework.stereotype.Component;
 
@@ -7,24 +8,26 @@ import java.util.Map;
 
 @Component
 public class AiQuotaPolicy {
-
-    private static final long THRESHOLD_WARNING = 700000;
-    private static final long THRESHOLD_PROTECT = 850000;
-    private static final long THRESHOLD_LIMIT = 900000;
+    private final AiQuotaProperties quotaProperties;
 
     private static final Map<AiLimitService.AiModule, Integer> GUEST_LIMITS = Map.of(
-            AiLimitService.AiModule.COACH, 2,
-            AiLimitService.AiModule.SOLVER, 5,
-            AiLimitService.AiModule.CHAT, 3,
+            AiLimitService.AiModule.COACH, 3,
+            AiLimitService.AiModule.SOLVER, 7,
+            AiLimitService.AiModule.CHAT, 5,
             AiLimitService.AiModule.RESUME, 0
     );
 
     private static final Map<AiLimitService.AiModule, Integer> USER_LIMITS = Map.of(
-            AiLimitService.AiModule.COACH, 8,
-            AiLimitService.AiModule.SOLVER, 20,
-            AiLimitService.AiModule.CHAT, 10,
-            AiLimitService.AiModule.RESUME, 3
+            AiLimitService.AiModule.COACH, 12,
+            AiLimitService.AiModule.SOLVER, 30,
+            AiLimitService.AiModule.CHAT, 16,
+            AiLimitService.AiModule.RESUME, 5
     );
+
+    public AiQuotaPolicy(AiQuotaProperties quotaProperties) {
+        this.quotaProperties = quotaProperties;
+        validateThresholdOrder();
+    }
 
     public int moduleLimit(String role, AiLimitService.AiModule module) {
         boolean guest = "GUEST".equalsIgnoreCase(role);
@@ -34,9 +37,9 @@ public class AiQuotaPolicy {
     public int totalLimit(String role, int degradeLevel) {
         boolean guest = "GUEST".equalsIgnoreCase(role);
         if (!guest) {
-            return 30;
+            return 45;
         }
-        return degradeLevel >= 1 ? 4 : 8;
+        return degradeLevel >= 1 ? 6 : 10;
     }
 
     public int cooldownSeconds(String role, AiLimitService.AiModule module) {
@@ -48,15 +51,32 @@ public class AiQuotaPolicy {
     }
 
     public int degradeLevel(long usage) {
-        if (usage >= THRESHOLD_LIMIT) {
+        long warningThreshold = thresholdFor(quotaProperties.getWarningRatio());
+        long protectThreshold = thresholdFor(quotaProperties.getProtectRatio());
+        long limitThreshold = thresholdFor(quotaProperties.getLimitRatio());
+
+        if (usage >= limitThreshold) {
             return 3;
         }
-        if (usage >= THRESHOLD_PROTECT) {
+        if (usage >= protectThreshold) {
             return 2;
         }
-        if (usage >= THRESHOLD_WARNING) {
+        if (usage >= warningThreshold) {
             return 1;
         }
         return 0;
+    }
+
+    private long thresholdFor(double ratio) {
+        return Math.max(1L, Math.round(quotaProperties.getDailyTokenLimit() * ratio));
+    }
+
+    private void validateThresholdOrder() {
+        double warning = quotaProperties.getWarningRatio();
+        double protect = quotaProperties.getProtectRatio();
+        double limit = quotaProperties.getLimitRatio();
+        if (!(warning < protect && protect < limit)) {
+            throw new IllegalStateException("Invalid quota ratios: warning < protect < limit is required.");
+        }
     }
 }

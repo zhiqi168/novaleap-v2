@@ -1,4 +1,5 @@
 import { createRouter, createWebHistory } from 'vue-router'
+import { getAdminToken } from '@/composables/adminAuthStorage'
 import Layout from '@/views/Layout.vue'
 import Dashboard from '@/views/Dashboard.vue'
 import SystemMonitor from '@/views/SystemMonitor.vue'
@@ -16,7 +17,7 @@ const router = createRouter({
       path: '/login',
       component: Login,
       name: 'Login',
-      meta: { requiresAuth: false }
+      meta: { requiresAuth: false },
     },
     {
       path: '/',
@@ -30,14 +31,14 @@ const router = createRouter({
         { path: 'notes', component: NoteManage, name: '手记管理' },
         { path: 'wishes', component: WishManage, name: '星愿审核' },
         { path: 'visitor-records', component: VisitorRecords, name: '浏览访客记录' },
-        { path: 'monitor', component: SystemMonitor, name: '系统监控' }
-      ]
-    }
-  ]
+        { path: 'monitor', component: SystemMonitor, name: '系统监控' },
+      ],
+    },
+  ],
 })
 
 router.beforeEach((to, from, next) => {
-  const token = localStorage.getItem('nova_admin_token')
+  const token = getAdminToken()
 
   if (to.meta.requiresAuth !== false && !token && to.name !== 'Login') {
     next({ name: 'Login' })

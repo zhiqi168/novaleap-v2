@@ -1,26 +1,137 @@
 <template>
-  <div class="min-h-screen bg-bg-base p-6 flex items-center justify-center">
-    <div class="w-full max-w-3xl bg-bg-surface rounded-3xl border border-border-subtle shadow-float p-7">
-      <h1 class="text-2xl font-bold text-text-primary">用户协议</h1>
-      <p class="mt-2 text-sm text-text-secondary">以下为占位文本，请在上线前替换为你的正式协议内容。</p>
+  <div class="min-h-screen bg-bg-base px-4 py-8 sm:px-6 lg:px-8">
+    <div class="mx-auto w-full max-w-5xl rounded-3xl border border-border-subtle bg-bg-surface p-7 shadow-float sm:p-9">
+      <div class="max-w-3xl">
+        <h1 class="text-3xl font-bold text-text-primary">用户协议</h1>
+        <p class="mt-3 text-sm leading-7 text-text-secondary">
+          欢迎使用 NovaLeap 知跃。为了保障你与平台双方的合法权益，请在注册、登录、以游客身份体验或继续使用本服务前，认真阅读并理解本协议。
+        </p>
+        <div class="mt-4 flex flex-wrap gap-x-6 gap-y-2 text-xs text-text-secondary">
+          <span>生效日期：2026年4月19日</span>
+          <span>最近更新：2026年4月19日</span>
+          <span>联系邮箱：zhiqi@novaleap.xyz</span>
+        </div>
+      </div>
 
-      <div class="mt-6 space-y-4 text-sm text-text-secondary leading-relaxed">
-        <p>1. 你在使用本服务时，应遵守相关法律法规。</p>
-        <p>2. 你需要保证提供的信息真实有效，并对账号安全负责。</p>
-        <p>3. 本服务将采取必要的技术措施保护你的数据安全，但无法保证任何情况下的绝对安全。</p>
-        <p>4. 我们可能会根据产品迭代更新协议内容，更新后以页面展示为准。</p>
+      <div class="mt-8 space-y-8">
+        <section
+          v-for="section in sections"
+          :key="section.title"
+          class="rounded-2xl border border-border-subtle/70 bg-bg-base/40 p-5 sm:p-6"
+        >
+          <h2 class="text-lg font-semibold text-text-primary">{{ section.title }}</h2>
+
+          <p
+            v-for="paragraph in section.paragraphs"
+            :key="paragraph"
+            class="mt-3 text-sm leading-7 text-text-secondary"
+          >
+            {{ paragraph }}
+          </p>
+
+          <ul v-if="section.items?.length" class="mt-4 space-y-3">
+            <li
+              v-for="(item, index) in section.items"
+              :key="item"
+              class="flex gap-3 text-sm leading-7 text-text-secondary"
+            >
+              <span class="font-semibold text-text-primary">{{ index + 1 }}.</span>
+              <span>{{ item }}</span>
+            </li>
+          </ul>
+        </section>
+      </div>
+
+      <div class="mt-8 rounded-2xl border border-border-subtle bg-bg-base p-4 text-xs leading-6 text-text-secondary">
+        本协议依据 NovaLeap 当前已上线或已在当前代码中实现的功能范围编写，包括账号体系、邮箱验证码、游客模式、题库、笔记、愿望墙、排行榜、AI 陪练、简历分析与访问统计等能力；如你的正式运营主体名称、注册地址、投诉渠道或特殊合规要求与当前页面不一致，请在正式商用前同步更新。
       </div>
 
       <div class="mt-8 flex justify-end">
-        <router-link
-          to="/login"
-          class="text-text-primary font-semibold hover:underline"
-        >返回登录</router-link>
+        <router-link to="/login" class="font-semibold text-text-primary hover:underline">
+          返回登录
+        </router-link>
       </div>
     </div>
   </div>
 </template>
 
 <script setup>
+const sections = [
+  {
+    title: '一、协议适用范围',
+    paragraphs: [
+      '本协议由 NovaLeap 知跃平台运营者（以下简称“我们”）与你就你访问、注册、登录、浏览或使用 NovaLeap 提供的相关网站、页面、产品功能与服务所订立。',
+      '当你点击同意、完成注册、实际登录、以游客身份体验或继续使用本服务时，即视为你已阅读、理解并接受本协议全部内容；若你不同意本协议的任一内容，请停止使用本服务。',
+      '若你未满十八周岁，请在监护人陪同下阅读本协议，并在取得监护人同意后使用本服务。'
+    ],
+  },
+  {
+    title: '二、服务内容',
+    items: [
+      'NovaLeap 当前主要提供注册登录、邮箱验证码验证、游客体验、个人资料维护、题库学习、笔记发布与互动、愿望墙互动、排行榜、小游戏、AI 陪练、AI 简历分析以及访问统计等服务。',
+      '我们有权基于产品运营、安全合规、功能升级或服务稳定性的需要，对服务内容、页面布局、开放范围、体验方式或访问规则进行调整。',
+      '部分功能可能因网络、系统维护、第三方服务异常、监管要求或不可抗力而暂时中断、延迟、受限或下线。'
+    ],
+  },
+  {
+    title: '三、账号注册、登录与游客体验',
+    items: [
+      '你应当使用本人合法控制的邮箱或账号信息进行注册、登录或验证，并保证所提交信息真实、准确、完整、有效。',
+      '你应妥善保管登录凭证、验证码和账号使用权限，不得出借、出租、转让、售卖或以其他方式允许第三方未经授权使用你的账号。',
+      '如你发现账号被盗用、存在异常登录或任何安全风险，应及时修改密码并通过页面或联系邮箱通知我们。',
+      '游客模式仅用于临时体验，游客身份下可使用的功能范围、数据保留期限和可迁移能力可能受限，我们不承诺游客数据具备与正式账号完全相同的保留和恢复能力。'
+    ],
+  },
+  {
+    title: '四、用户行为规范',
+    items: [
+      '你在使用本服务时，应遵守中华人民共和国现行法律法规及公序良俗，不得利用本服务从事违法违规、侵权、诈骗、作弊、骚扰、传播有害信息或破坏网络安全的行为。',
+      '你不得实施包括但不限于批量抓取、恶意爬虫、绕过权限控制、攻击接口、干扰系统正常运行、伪造数据、刷量、利用漏洞牟利等行为。',
+      '你不得上传、发布、传播或诱导他人传播侵犯他人知识产权、商业秘密、隐私权、肖像权、名誉权或个人信息权益的内容。',
+      '在笔记、评论、愿望墙、昵称、头像、题库内容、简历文本、聊天消息等可输入区域中，你应避免主动披露与你无关的他人信息、未获授权的敏感信息、国家秘密、商业秘密或其他不宜公开的内容。'
+    ],
+  },
+  {
+    title: '五、用户内容与授权',
+    paragraphs: [
+      '你对依法享有权利的原创内容仍保留相应权利；但为实现服务展示、存储、审核、检索、推荐、排障、备份、模型处理及必要的运营管理，你同意授予我们一项免费、非排他、在服务范围内必要的使用许可。',
+    ],
+    items: [
+      '该等许可包括将你的内容用于页面展示、审核处理、生成摘要、内容安全检测、统计分析以及向实现服务所必需的技术服务商进行委托处理。',
+      '对于违反法律法规、本协议或平台规则的内容，我们有权视情况进行审核、折叠、屏蔽、删除、限制传播、拒绝发布或采取其他必要处置措施。',
+      '如果你提交的内容引发投诉、争议、索赔或监管处理，你应自行承担相应责任；因你的行为导致我们遭受损失的，我们有权依法追偿。'
+    ],
+  },
+  {
+    title: '六、AI 功能特别说明',
+    items: [
+      'NovaLeap 提供的 AI 陪练、AI 简历分析、题目讲解、笔记摘要或其他生成式能力，系基于算法模型与第三方 AI 服务输出，仅供学习、表达、启发和一般信息参考，不构成法律、医疗、心理、投资、就业录用或其他专业建议。',
+      'AI 输出可能存在错误、遗漏、偏差、过时信息或不符合你具体场景的情形，你应结合自身判断进行甄别，并对基于 AI 输出作出的决定自行负责。',
+      '你承诺不会向 AI 功能输入违法违规内容、未获授权的他人个人信息、商业秘密、国家秘密或其他依法不得处理的数据。'
+    ],
+  },
+  {
+    title: '七、知识产权',
+    items: [
+      'NovaLeap 平台软件、页面设计、界面结构、已由平台合法取得授权的内容、商标、标识、代码、文档及相关资料的知识产权，依法归我们或相关权利人所有。',
+      '未经我们或相关权利人事先书面许可，你不得对平台内容进行复制、传播、改编、反向工程、反编译、镜像、出租、出售或以其他方式超范围使用。'
+    ],
+  },
+  {
+    title: '八、违约处理与责任限制',
+    items: [
+      '如你违反本协议、相关法律法规或平台规则，我们有权独立判断并采取警示、限制功能、删除内容、暂停服务、终止账号、保留证据、向主管机关报告等措施。',
+      '我们会在现有技术能力范围内采取合理的安全与稳定性保障措施，但互联网服务受技术、网络环境、第三方依赖及不可抗力等因素影响，无法保证服务始终连续、即时、无误或绝对安全。',
+      '在法律允许范围内，对于因你自身原因、第三方行为、不可抗力、网络故障、系统维护、黑客攻击或非因我们故意或重大过失造成的损失，我们依法承担与过错相适应的责任。'
+    ],
+  },
+  {
+    title: '九、协议变更、终止与争议解决',
+    paragraphs: [
+      '我们有权根据法律法规变化、业务调整、功能迭代或服务运营需要对本协议进行更新，并通过页面展示、站内公告或其他合理方式进行通知。更新后的协议一经公布或在通知载明日期生效。',
+      '若你在协议更新后继续使用本服务，视为你接受更新后的内容；若你不同意更新内容，应停止使用相关服务。',
+      '本协议的订立、效力、解释、履行及争议解决均适用中华人民共和国大陆地区法律。因本协议引起的或与本协议有关的争议，双方应先友好协商；协商不成的，任何一方均可依法向有管辖权的人民法院提起诉讼。'
+    ],
+  },
+]
 </script>
-

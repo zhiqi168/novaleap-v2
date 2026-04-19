@@ -13,5 +13,7 @@ public interface LeaderboardService {
 
     Map<String, Object> getLeaderboard();
 
+    Map<String, Object> getUserSnapshot(String username);
+
     Set<Long> getDoneQuestionIds(String username);
 }

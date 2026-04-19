@@ -3,18 +3,28 @@ package com.novaleap.api.module.admin.user.service;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.novaleap.api.common.exception.NotFoundException;
+import com.novaleap.api.entity.CustomQuestionBank;
+import com.novaleap.api.entity.Question;
+import com.novaleap.api.entity.UserQuestionMastery;
 import com.novaleap.api.entity.User;
+import com.novaleap.api.mapper.CustomQuestionBankMapper;
+import com.novaleap.api.mapper.QuestionMapper;
+import com.novaleap.api.mapper.UserQuestionMasteryMapper;
 import com.novaleap.api.mapper.UserMapper;
+import com.novaleap.api.module.auth.support.AuthTokenStateSupport;
 import com.novaleap.api.module.admin.user.assembler.AdminUserViewAssembler;
 import com.novaleap.api.module.admin.user.dto.AdminUserSaveRequest;
 import com.novaleap.api.module.admin.user.vo.AdminUserVO;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.Collections;
 import java.util.List;
+import java.util.Objects;
 import java.util.Set;
 
 @Service
@@ -24,10 +34,28 @@ public class AdminUserApplicationService {
 
     private final UserMapper userMapper;
     private final PasswordEncoder passwordEncoder;
+    private final CustomQuestionBankMapper customQuestionBankMapper;
+    private final QuestionMapper questionMapper;
+    private final UserQuestionMasteryMapper userQuestionMasteryMapper;
+    private final JdbcTemplate jdbcTemplate;
+    private final AuthTokenStateSupport authTokenStateSupport;
 
-    public AdminUserApplicationService(UserMapper userMapper, PasswordEncoder passwordEncoder) {
+    public AdminUserApplicationService(
+            UserMapper userMapper,
+            PasswordEncoder passwordEncoder,
+            CustomQuestionBankMapper customQuestionBankMapper,
+            QuestionMapper questionMapper,
+            UserQuestionMasteryMapper userQuestionMasteryMapper,
+            JdbcTemplate jdbcTemplate,
+            AuthTokenStateSupport authTokenStateSupport
+    ) {
         this.userMapper = userMapper;
         this.passwordEncoder = passwordEncoder;
+        this.customQuestionBankMapper = customQuestionBankMapper;
+        this.questionMapper = questionMapper;
+        this.userQuestionMasteryMapper = userQuestionMasteryMapper;
+        this.jdbcTemplate = jdbcTemplate;
+        this.authTokenStateSupport = authTokenStateSupport;
     }
 
     public Page<AdminUserVO> getUserList(Integer page, Integer size, String keyword, String role) {
@@ -105,9 +133,42 @@ public class AdminUserApplicationService {
         return AdminUserViewAssembler.toVO(user);
     }
 
+    @Transactional(rollbackFor = Exception.class)
     public void deleteUser(Long id) {
-        loadUser(id);
-        userMapper.deleteById(id);
+        User user = loadUser(id);
+        Long userId = user.getId();
+
+        List<Long> customBankIds = customQuestionBankMapper.selectList(
+                        new LambdaQueryWrapper<CustomQuestionBank>()
+                                .select(CustomQuestionBank::getId)
+                                .eq(CustomQuestionBank::getUserId, userId)
+                ).stream()
+                .map(CustomQuestionBank::getId)
+                .filter(Objects::nonNull)
+                .toList();
+
+        // note_comments uses logical delete in code but a physical FK in DB, so cleanup must be hard delete.
+        jdbcTemplate.update("DELETE FROM note_comments WHERE user_id = ?", userId);
+        jdbcTemplate.update("DELETE FROM game_score_logs WHERE user_id = ?", userId);
+
+        userQuestionMasteryMapper.delete(new LambdaQueryWrapper<UserQuestionMastery>()
+                .eq(UserQuestionMastery::getUserId, userId));
+
+        if (!customBankIds.isEmpty()) {
+            questionMapper.delete(new LambdaQueryWrapper<Question>()
+                    .in(Question::getCustomBankId, customBankIds));
+        }
+        questionMapper.delete(new LambdaQueryWrapper<Question>()
+                .eq(Question::getOwnerUserId, userId));
+        customQuestionBankMapper.delete(new LambdaQueryWrapper<CustomQuestionBank>()
+                .eq(CustomQuestionBank::getUserId, userId));
+
+        try {
+            userMapper.deleteById(userId);
+            authTokenStateSupport.invalidateUserTokens(user.getUsername());
+        } catch (DataIntegrityViolationException e) {
+            throw new IllegalArgumentException("该用户仍有关联业务数据，暂时无法删除，请先清理关联记录后重试");
+        }
     }
 
     private User loadUser(Long id) {

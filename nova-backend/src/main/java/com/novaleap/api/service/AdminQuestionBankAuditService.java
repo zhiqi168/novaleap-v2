@@ -84,11 +84,11 @@ public class AdminQuestionBankAuditService {
             String category,
             Integer difficulty
     ) throws IOException {
-        validateImportFile(file);
+        questionBankImportService.validateImportFile(file, MAX_FILE_SIZE);
 
         QuestionBankImportService.ImportPayload payload = questionBankImportService.analyzeFile(file.getOriginalFilename(), file.getBytes());
         if (payload.questions().isEmpty()) {
-            throw new IllegalArgumentException("未解析到有效题目，请上传符合模板格式的 TXT 文件");
+            throw new IllegalArgumentException("鏈В鏋愬埌鏈夋晥棰樼洰锛岃涓婁紶绗﹀悎妯℃澘鏍煎紡鐨?TXT 鏂囦欢");
         }
 
         String bankName = questionBankSupport.resolveBankName(name, file.getOriginalFilename());
@@ -130,12 +130,12 @@ public class AdminQuestionBankAuditService {
     public AdminQuestionBankVO auditQuestionBank(Long id, AdminQuestionBankAuditRequest request) {
         CustomQuestionBank bank = customQuestionBankMapper.selectById(id);
         if (bank == null) {
-            throw new NotFoundException("题库不存在");
+            throw new NotFoundException("棰樺簱涓嶅瓨鍦?");
         }
 
         Integer targetStatus = questionBankSupport.normalizeBankStatus(request.getStatus());
         if (targetStatus == null || targetStatus == QuestionAccessSupport.BANK_STATUS_PENDING) {
-            throw new IllegalArgumentException("审核状态不合法");
+            throw new IllegalArgumentException("瀹℃牳鐘舵€佷笉鍚堟硶");
         }
 
         String normalizedExistingCategory = questionBankSupport.normalizeCategory(bank.getCategory());
@@ -150,7 +150,7 @@ public class AdminQuestionBankAuditService {
         if (StringUtils.hasText(request.getCategory())) {
             String category = questionBankSupport.normalizeCategory(request.getCategory());
             if (category == null) {
-                throw new IllegalArgumentException("题库分类不合法");
+                throw new IllegalArgumentException("棰樺簱鍒嗙被涓嶅悎娉?");
             }
             bank.setCategory(category);
         }
@@ -158,17 +158,17 @@ public class AdminQuestionBankAuditService {
         if (request.getDifficulty() != null) {
             Integer difficulty = questionBankSupport.normalizeDifficulty(request.getDifficulty());
             if (difficulty == null) {
-                throw new IllegalArgumentException("题库难度不合法");
+                throw new IllegalArgumentException("棰樺簱闅惧害涓嶅悎娉?");
             }
             bank.setDifficulty(difficulty);
         }
 
         String rejectReason = questionBankSupport.normalizeRejectReason(request.getRejectReason());
         if (targetStatus == QuestionAccessSupport.BANK_STATUS_REJECTED && !StringUtils.hasText(rejectReason)) {
-            throw new IllegalArgumentException("驳回原因不能为空");
+            throw new IllegalArgumentException("椹冲洖鍘熷洜涓嶈兘涓虹┖");
         }
         if (targetStatus == QuestionAccessSupport.BANK_STATUS_REJECTED && bank.getImportedAt() != null) {
-            throw new IllegalArgumentException("已导入的题库不能再次驳回");
+            throw new IllegalArgumentException("宸插鍏ョ殑棰樺簱涓嶈兘鍐嶆椹冲洖");
         }
 
         if (targetStatus == QuestionAccessSupport.BANK_STATUS_APPROVED && bank.getImportedAt() == null) {
@@ -188,7 +188,7 @@ public class AdminQuestionBankAuditService {
     private void importQuestions(CustomQuestionBank bank) {
         List<QuestionBankImportService.QuestionDraft> drafts = questionBankImportService.parseQuestions(bank.getRawContent());
         if (drafts.isEmpty()) {
-            throw new IllegalArgumentException("未从该题库中解析到有效题目");
+            throw new IllegalArgumentException("鏈粠璇ラ搴撲腑瑙ｆ瀽鍒版湁鏁堥鐩?");
         }
 
         LocalDateTime now = LocalDateTime.now();
@@ -245,15 +245,6 @@ public class AdminQuestionBankAuditService {
                 record.setOwnerUsername(owner.getUsername());
                 record.setOwnerNickname(owner.getNickname());
             }
-        }
-    }
-
-    private void validateImportFile(MultipartFile file) {
-        if (file == null || file.isEmpty()) {
-            throw new IllegalArgumentException("请选择题库文件");
-        }
-        if (file.getSize() > MAX_FILE_SIZE) {
-            throw new IllegalArgumentException("文件大小不能超过 5MB");
         }
     }
 }

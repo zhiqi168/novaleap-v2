@@ -7,10 +7,6 @@ import java.util.Map;
 
 public interface AuthService extends IService<User> {
 
-    Map<String, Object> login(String username, String password, String ip, String turnstileToken);
-
-    Map<String, Object> loginByEmailCode(String username, String ip, String turnstileToken);
-
     Map<String, Object> guestLogin();
 
     Map<String, Object> register(
@@ -24,6 +20,8 @@ public interface AuthService extends IService<User> {
     );
 
     boolean emailExists(String email);
+
+    void logout(String username);
 
     void resetPassword(String username, String newPassword, String clientIp, String userAgent);
 

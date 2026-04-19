@@ -2,10 +2,11 @@
   <section ref="sectionRef" class="story-shell">
     <div class="story-head" data-reveal>
       <p class="story-eyebrow">Sticky Storytelling</p>
-      <h2 class="story-title">不再只是列出功能，而是让每一步都解释清楚为什么值得继续往下走。</h2>
-      <p class="story-copy">
+      <h2 class="story-title">不只是展示功能，</h2>
+      <h2 class="story-title">而是让每一步，都有继续探索的理由。</h2>
+      <!-- <p class="story-copy">
         左侧继续讲述每个阶段的价值，右侧保持稳定展示当前模块的样例。滚动时，内容会非常克制地切换，让页面更像成熟产品官网的叙事方式。
-      </p>
+      </p> -->
     </div>
 
     <div class="story-grid">
@@ -92,8 +93,21 @@ const stickyColumnMinHeight = ref('520vh')
 const stepMap = new Map()
 let stepObserver = null
 let resizeRaf = null
+const isCompactLayout = () => window.innerWidth <= 1080
+
+const destroyObserver = () => {
+  if (stepObserver) {
+    stepObserver.disconnect()
+    stepObserver = null
+  }
+}
 
 const syncStickyHeight = () => {
+  if (isCompactLayout()) {
+    stickyColumnMinHeight.value = 'auto'
+    return
+  }
+
   const stepsEl = stepsRef.value
   if (!stepsEl) return
   
@@ -128,6 +142,7 @@ const handleResize = () => {
     cancelAnimationFrame(resizeRaf)
   }
   resizeRaf = requestAnimationFrame(() => {
+    initObserver()
     syncStickyHeight()
     resizeRaf = null
   })
@@ -162,8 +177,15 @@ const pickCenteredStep = (root, nodes) => {
 }
 
 const initObserver = () => {
+  destroyObserver()
+
   const root = sectionRef.value?.closest('.home-page')
   if (!root || !props.steps.length) return
+
+  if (isCompactLayout()) {
+    emit('step-change', props.activeStepId || props.steps[0]?.id || '')
+    return
+  }
 
   const nodes = props.steps
     .map((step) => stepMap.get(step.id))
@@ -176,7 +198,7 @@ const initObserver = () => {
     if (centeredId) emit('step-change', centeredId)
   }, {
     root,
-    threshold: [0, 0.08, 0.16, 0.24, 0.32, 0.48, 0.64, 0.8, 1],
+    threshold: [0, 0.25, 0.5, 0.75, 1],
     rootMargin: '0px 0px 0px 0px',
   })
 
@@ -196,7 +218,7 @@ onMounted(async () => {
 })
 
 onUnmounted(() => {
-  if (stepObserver) stepObserver.disconnect()
+  destroyObserver()
   window.removeEventListener('resize', handleResize)
   if (resizeRaf) cancelAnimationFrame(resizeRaf)
 })
@@ -204,11 +226,11 @@ onUnmounted(() => {
 
 <style scoped>
 .story-shell {
-  padding-block: 34px 84px;
+  padding-block: 8vh 5vh;
 }
 
 .story-head {
-  max-width: 760px;
+  max-width: 950px;
   padding-bottom: 42px;
 }
 
@@ -249,7 +271,7 @@ onUnmounted(() => {
 .story-steps::after {
   content: '';
   display: block;
-  height: clamp(180px, 26vh, 320px);
+  height: clamp(56px, 9vh, 110px);
 }
 
 .story-step {
@@ -262,35 +284,57 @@ onUnmounted(() => {
 .story-card {
   width: 100%;
   max-width: 560px;
-  border-radius: 32px;
+  border-radius: var(--radius-xl);
   border: 1px solid var(--border-soft);
-  background: var(--bg-ghost);
-  padding: 30px 28px;
-  opacity: 0.42;
-  transform: translateY(24px);
+  background: var(--bg-surface);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  padding: 34px 30px;
+  opacity: 0.6;
+  transform: translateY(24px) scale(0.96);
   transition:
     opacity 620ms cubic-bezier(0.22, 1, 0.36, 1),
     transform 620ms cubic-bezier(0.22, 1, 0.36, 1),
     background-color 620ms ease,
+    backdrop-filter 620ms ease,
     box-shadow 620ms ease;
+  will-change: transform, opacity;
 }
 
 .story-card-active {
   opacity: 1;
-  transform: translateY(0);
-  background: var(--surface-panel-soft);
-  box-shadow: var(--shadow-float);
+  transform: translateY(0) scale(1);
+  background: var(--bg-elevated);
+  border-color: var(--primary-soft);
+  box-shadow: var(--shadow-hover);
 }
 
 .dark .story-card {
-  background: var(--bg-ghost);
-  border-color: var(--border-soft);
+  width: 100%;
+  max-width: 560px;
+  border-radius: var(--radius-xl);
+  border: 1px solid var(--border-soft);
+  background: var(--bg-surface);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  padding: 34px 30px;
+  opacity: 0.6;
+  transform: translateY(24px) scale(0.96);
+  transition:
+    opacity 620ms cubic-bezier(0.22, 1, 0.36, 1),
+    transform 620ms cubic-bezier(0.22, 1, 0.36, 1),
+    background-color 620ms ease,
+    backdrop-filter 620ms ease,
+    box-shadow 620ms ease;
+  will-change: transform, opacity;
 }
 
-.dark .story-card-active {
-  background: var(--surface-panel-soft);
-  border-color: var(--accent-border);
-  box-shadow: var(--shadow-float);
+.story-card-active {
+  opacity: 1;
+  transform: translateY(0) scale(1);
+  background: var(--bg-elevated);
+  border-color: var(--primary-soft);
+  box-shadow: var(--shadow-hover);
 }
 
 .story-card-head {
@@ -317,7 +361,9 @@ onUnmounted(() => {
   background: var(--accent-soft);
   color: var(--primary);
   font-size: 11px;
-  font-weight: 600;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  transition: all 0.3s ease;
 }
 
 .story-tag {
@@ -355,7 +401,13 @@ onUnmounted(() => {
 }
 
 .detail-pill {
-  padding: 8px 12px;
+  padding: 6px 14px;
+  border: 1.5px solid var(--accent-border);
+}
+
+.detail-pill:hover {
+  background: var(--accent-strong);
+  transform: translateY(-1px);
 }
 
 .story-card-actions {
@@ -397,15 +449,16 @@ onUnmounted(() => {
 @media (max-width: 1080px) {
   .story-grid {
     grid-template-columns: 1fr;
+    gap: 22px;
   }
 
   .story-sticky-column {
     min-height: auto;
-    order: -1;
+    order: 1;
   }
 
   .story-steps::after {
-    height: 24px;
+    height: 12px;
   }
 
   .story-sticky-panel {
@@ -415,29 +468,72 @@ onUnmounted(() => {
 
   .story-step {
     min-height: auto;
-    padding-block: 22px;
+    padding-block: 14px;
+    scroll-margin-top: 100px;
   }
 
   .story-card {
+    max-width: none;
+    padding: 28px 24px;
     opacity: 1;
     transform: none;
+    will-change: auto;
+  }
+
+  .story-card-active {
+    box-shadow: var(--shadow-base);
+  }
+
+  .dark .story-tag,
+  .dark .detail-pill,
+  .dark .story-link {
+    background: var(--accent-soft);
+    border-color: var(--accent-border);
   }
 }
 
-.dark .story-card,
-.dark .story-link-soft {
-  background: var(--surface-panel-soft);
-  border-color: var(--border-soft);
-}
+@media (max-width: 768px) {
+  .story-shell {
+    padding-block: 40px 24px;
+  }
 
-.dark .story-card-active {
-  background: var(--surface-panel);
-}
+  .story-head {
+    padding-bottom: 24px;
+  }
 
-.dark .story-tag,
-.dark .detail-pill,
-.dark .story-link {
-  background: var(--accent-soft);
-  border-color: var(--accent-border);
+  .story-title {
+    font-size: clamp(30px, 10vw, 42px);
+    line-height: 1.12;
+  }
+
+  .story-grid {
+    gap: 18px;
+  }
+
+  .story-card {
+    padding: 22px 18px;
+    border-radius: 22px;
+    transition:
+      border-color 220ms ease,
+      background-color 220ms ease,
+      box-shadow 220ms ease;
+  }
+
+  .story-card-title {
+    font-size: clamp(22px, 7vw, 30px);
+  }
+
+  .story-card-copy {
+    font-size: 14px;
+    line-height: 1.8;
+  }
+
+  .story-card-details {
+    gap: 8px;
+  }
+
+  .detail-pill {
+    padding: 6px 12px;
+  }
 }
 </style>

@@ -32,12 +32,13 @@ public class AiServiceImpl implements AiService {
     private static final String SOLVER_FALLBACK_MSG = "当前无法生成题解，请稍后重试。";
     private static final String COACH_FALLBACK_MSG = "当前无法生成回复，请稍后重试。";
     private static final String RESUME_FALLBACK_MSG = "当前无法完成简历分析，请稍后重试。";
-    private static final String NOVALEAP_IDENTITY_LINE = "I am the self-developed model of NovaLeap.";
-    private static final String NOVALEAP_IDENTITY_FALLBACK = "I can continue to help with interview coaching, technical explanations, and growth advice.";
-    private static final String CREATOR_FIXED_REPLY = "Zhang Zhiqi is my creator.";
+    private static final String DAILY_QUOTE_FALLBACK = "把今天认真走稳，明天就会向你靠近。";
+    private static final String NOVALEAP_IDENTITY_LINE = "我是NovaLeap自主研发的模型。";
+    private static final String NOVALEAP_IDENTITY_FALLBACK = "我仍可以继续提供面试辅导、技术讲解以及职业发展建议。";
+    private static final String CREATOR_FIXED_REPLY = "张志琪是我的创作者。";
     private static final String DEFAULT_TOPIC = "通用技术面试";
     private static final String DEFAULT_MODE = "coach";
-    private static final String DEFAULT_RESUME_ROLE = "Java Backend Engineer";
+    private static final String DEFAULT_RESUME_ROLE = "Java后端工程师";
     private static final int MAX_PROMPT_HISTORY = 8;
 
     private final QuestionMapper questionMapper;
@@ -214,6 +215,36 @@ public class AiServiceImpl implements AiService {
     @Override
     public List<String> summarizeNote(String username, String title, String noteContent) {
         return aiNoteWorkflowSupport.summarizeNote(username, aiIdentitySupport.resolveRole(username), title, noteContent, hasAiCapability());
+    }
+
+    @Override
+    public String generateDailyQuote(String username, String nickname) {
+        if (!hasAiCapability()) {
+            return DAILY_QUOTE_FALLBACK;
+        }
+
+        AiLimitService.LimitCheckResult limit = aiLimitService.checkLimit(
+                username,
+                aiIdentitySupport.resolveRole(username),
+                AiLimitService.AiModule.CHAT
+        );
+        if (!limit.isAllowed()) {
+            return DAILY_QUOTE_FALLBACK;
+        }
+
+        String answer = aiModelGateway.callModel(
+                aiPromptFactory.coachSystemPrompt(),
+                aiPromptFactory.buildDailyQuotePrompt(nickname),
+                DAILY_QUOTE_FALLBACK,
+                AiLimitService.AiModule.CHAT
+        );
+        String sanitized = aiIdentitySupport.safe(answer)
+                .replace("\r", "")
+                .replace("\n", "")
+                .replace("\"", "")
+                .replace("“", "")
+                .replace("”", "");
+        return sanitized.isBlank() ? DAILY_QUOTE_FALLBACK : sanitized;
     }
 
     @Override

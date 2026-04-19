@@ -10,6 +10,8 @@ import com.novaleap.api.mapper.QuestionMapper;
 import com.novaleap.api.mapper.UserMapper;
 import com.novaleap.api.mapper.WishMapper;
 import com.novaleap.api.service.AnalyticsService;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 
 import java.util.Collections;
@@ -17,27 +19,33 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.function.Supplier;
 
+@Slf4j
 @Service
 public class AdminDashboardApplicationService {
+
+    private static final String AI_AUDIT_RECENT_KEY = "nova:ai:audit:recent";
 
     private final UserMapper userMapper;
     private final NoteMapper noteMapper;
     private final QuestionMapper questionMapper;
     private final WishMapper wishMapper;
     private final AnalyticsService analyticsService;
+    private final StringRedisTemplate redisTemplate;
 
     public AdminDashboardApplicationService(
             UserMapper userMapper,
             NoteMapper noteMapper,
             QuestionMapper questionMapper,
             WishMapper wishMapper,
-            AnalyticsService analyticsService
+            AnalyticsService analyticsService,
+            StringRedisTemplate redisTemplate
     ) {
         this.userMapper = userMapper;
         this.noteMapper = noteMapper;
         this.questionMapper = questionMapper;
         this.wishMapper = wishMapper;
         this.analyticsService = analyticsService;
+        this.redisTemplate = redisTemplate;
     }
 
     public Map<String, Object> getDashboard() {
@@ -49,7 +57,7 @@ public class AdminDashboardApplicationService {
         data.put("noteCount", safeCount(() -> noteMapper.selectCount(null)));
         data.put("questionCount", safeCount(() -> questionMapper.selectCount(null)));
         data.put("wishCount", safeCount(() -> wishMapper.selectCount(null)));
-        data.put("aiCallCount", 4520);
+        data.put("aiCallCount", safeRecentAiCallCount());
         data.putAll(safeVisitStats());
         return data;
     }
@@ -74,7 +82,8 @@ public class AdminDashboardApplicationService {
         try {
             Long count = supplier.get();
             return count == null ? 0L : count;
-        } catch (Exception ignore) {
+        } catch (Exception e) {
+            log.warn("dashboard count query failed", e);
             return 0L;
         }
     }
@@ -82,7 +91,8 @@ public class AdminDashboardApplicationService {
     private Map<String, Object> safeVisitStats() {
         try {
             return analyticsService.getVisitStats();
-        } catch (Exception ignore) {
+        } catch (Exception e) {
+            log.warn("dashboard visit stats query failed", e);
             Map<String, Object> fallback = new HashMap<>();
             fallback.put("guestPv", 0L);
             fallback.put("guestUv", 0L);
@@ -100,6 +110,16 @@ public class AdminDashboardApplicationService {
             fallback.put("topRegionsToday", Collections.emptyList());
             fallback.put("recentGeoVisits", Collections.emptyList());
             return fallback;
+        }
+    }
+
+    private long safeRecentAiCallCount() {
+        try {
+            Long size = redisTemplate.opsForList().size(AI_AUDIT_RECENT_KEY);
+            return size == null ? 0L : size;
+        } catch (Exception e) {
+            log.warn("dashboard ai audit count query failed", e);
+            return 0L;
         }
     }
 }

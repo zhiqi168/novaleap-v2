@@ -71,11 +71,11 @@ defineProps({
 .launch-card {
   position: relative;
   overflow: hidden;
-  border-radius: 30px;
+  border-radius: var(--radius-xl);
   border: 1px solid var(--border-soft);
   background: var(--bg-soft);
-  backdrop-filter: blur(18px);
-  box-shadow: var(--shadow-card);
+  backdrop-filter: blur(8px);
+  box-shadow: var(--shadow-base);
   padding: 24px;
   transition:
     transform 0.32s cubic-bezier(0.22, 1, 0.36, 1),
@@ -92,14 +92,14 @@ defineProps({
   height: 130px;
   border-radius: 999px;
   background: var(--module-glow-c);
-  filter: blur(46px);
+  filter: blur(24px);
   opacity: 0;
   transition: opacity 0.32s ease;
 }
 
 .launch-card:hover {
   transform: translateY(-8px) scale(1.015);
-  box-shadow: var(--shadow-float);
+  box-shadow: var(--shadow-hover);
   border-color: var(--accent-border);
 }
 

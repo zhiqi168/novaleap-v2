@@ -1,6 +1,12 @@
 <template>
-  <div class="question-bank-shell workspace-shell h-full flex flex-col md:flex-row overflow-hidden sm:mx-4">
-    <div class="md:hidden px-3 pt-3 pb-2 border-b border-border-subtle bg-bg-surface/80 backdrop-blur">
+  <div
+    class="question-bank-shell workspace-shell h-full min-h-0 flex flex-col md:flex-row overflow-hidden sm:mx-4"
+    @touchstart.passive="handleTouchStart"
+    @touchmove.passive="handleTouchMove"
+    @touchend="handleTouchEnd"
+    @touchcancel="resetTouchState"
+  >
+    <div class="md:hidden shrink-0 px-3 pt-3 pb-2 border-b border-border-subtle bg-bg-surface/80 backdrop-blur">
       <div class="grid grid-cols-2 gap-2 rounded-xl bg-black/[0.03] p-1">
         <button
           class="rounded-lg px-3 py-2 text-sm font-semibold transition-colors"
@@ -20,10 +26,10 @@
     </div>
 
     <aside
-      class="w-full md:w-[430px] xl:w-[460px] border-b md:border-b-0 md:border-r border-border-subtle bg-bg-surface backdrop-blur-xl flex-col"
+      class="w-full h-full min-h-0 md:w-[430px] xl:w-[460px] border-b md:border-b-0 md:border-r border-border-subtle bg-bg-surface backdrop-blur-xl flex-col"
       :class="mobileTab === 'detail' ? 'hidden md:flex' : 'flex'"
     >
-      <div class="px-4 py-4 border-b border-border-subtle">
+      <div class="shrink-0 px-4 py-4 border-b border-border-subtle">
         <div class="flex items-start justify-between gap-3">
           <div>
             <h2 class="text-2xl font-bold text-text-primary">拾光题库</h2>
@@ -211,7 +217,7 @@
         </div>
       </div>
 
-      <div class="flex-1 overflow-y-auto px-2 py-2 custom-scrollbar">
+      <div class="question-list-scroll custom-scrollbar flex-1 min-h-0 overflow-y-auto px-2 py-2">
         <div class="mb-2 flex items-center justify-between px-1 text-[11px] text-text-tertiary">
           <span>共 {{ totalQuestions }} 题 · 当前 10 题/页</span>
           <span v-if="questions.length > 0 && totalQuestions > questions.length">可翻页查看更多</span>
@@ -239,7 +245,6 @@
             @click="openQuestion(q)"
           >
             <div class="flex items-center gap-2 flex-wrap">
-              <span class="text-xs px-2 py-1 rounded-md bg-black/[0.04] text-text-tertiary">#{{ q.id }}</span>
               <span
                 v-if="isDoneQuestion(q.id)"
                 class="text-[10px] px-1.5 py-0.5 rounded-full bg-emerald-100 text-emerald-700 font-semibold"
@@ -286,11 +291,11 @@
     </aside>
 
     <section
-      class="flex-1 overflow-y-auto bg-bg-base custom-scrollbar"
+      class="question-detail-surface question-detail-scroll custom-scrollbar flex-1 min-h-0 overflow-y-auto bg-bg-base"
       :class="mobileTab === 'list' ? 'hidden md:block' : 'block'"
     >
       <div v-if="!activeQuestion" class="h-full grid place-items-center text-text-tertiary">
-        <div v-if="currentBank && !isApprovedBank(currentBank)" class="max-w-lg rounded-3xl border border-black/8 bg-white/82 px-8 py-9 text-center shadow-sm">
+        <div v-if="currentBank && !isApprovedBank(currentBank)" class="question-empty-card max-w-lg rounded-3xl border border-black/8 bg-white/82 px-8 py-9 text-center shadow-sm">
           <p class="text-xs tracking-[0.26em] uppercase text-text-tertiary">Custom Bank</p>
           <h3 class="mt-3 text-3xl font-display font-bold text-text-primary">{{ currentBank.name }}</h3>
           <span class="inline-flex mt-4 px-3 py-1 rounded-full text-xs font-semibold" :class="bankStatusClass(currentBank.status)">
@@ -302,8 +307,8 @@
           </p>
         </div>
 
-        <div v-else class="text-center px-6">
-          <div class="w-24 h-24 rounded-2xl bg-white/80 border border-black/8 shadow-sm mx-auto mb-4 grid place-items-center">
+        <div v-else class="question-empty-wrap text-center px-6">
+          <div class="question-empty-icon w-24 h-24 rounded-2xl bg-white/80 border border-black/8 shadow-sm mx-auto mb-4 grid place-items-center">
             <svg class="w-11 h-11 opacity-35" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4 6h16M4 12h16M4 18h10" />
             </svg>
@@ -312,7 +317,7 @@
         </div>
       </div>
 
-      <div v-else class="px-5 md:px-8 xl:px-10 py-7 max-w-[1020px] mx-auto">
+      <div v-else class="question-detail-stack min-h-full px-5 md:px-8 xl:px-10 py-7 max-w-[1020px] mx-auto">
         <div class="flex items-center flex-wrap gap-2">
           <button
             class="workspace-btn workspace-btn-muted md:hidden text-xs px-2.5 py-1 rounded-lg border border-black/10 bg-white text-text-secondary"
@@ -338,14 +343,14 @@
 
         <h1 class="mt-4 text-2xl font-bold text-text-primary leading-tight">{{ activeQuestion.title }}</h1>
 
-        <article class="mt-5 rounded-3xl border border-border-subtle bg-bg-elevated backdrop-blur-xl p-6 shadow-sm">
+        <article class="question-content-card mt-5 rounded-3xl border border-border-subtle bg-bg-elevated backdrop-blur-xl p-6 shadow-sm">
           <div class="text-sm font-semibold text-text-primary mb-3">题目内容</div>
           <div class="prose prose-sm max-w-none text-text-secondary">
             <TypeWriter :text="activeQuestion.content || '暂无题目内容'" :renderMarkdown="true" :isTyping="false" />
           </div>
         </article>
 
-        <article class="mt-4 rounded-3xl border border-border-subtle bg-bg-elevated backdrop-blur-xl p-6 shadow-sm">
+        <article class="question-answer-card mt-4 rounded-3xl border border-border-subtle bg-bg-elevated backdrop-blur-xl p-6 shadow-sm">
           <div class="flex items-center gap-3 mb-3 flex-wrap">
             <div class="text-sm font-semibold text-text-primary">参考答案</div>
             <button
@@ -359,9 +364,11 @@
               来源：{{ dbAnswerSource }}
             </span>
           </div>
-          <div v-if="dbAnswerLoading" class="py-3"><LoadingDots /></div>
-          <div v-else class="prose prose-sm max-w-none text-text-secondary">
-            <TypeWriter :text="dbAnswer || '当前题目尚未配置参考答案'" :renderMarkdown="true" :isTyping="false" />
+          <div class="answer-body">
+            <div v-if="dbAnswerLoading" class="py-3"><LoadingDots /></div>
+            <div v-else class="prose prose-sm max-w-none text-text-secondary">
+              <TypeWriter :text="dbAnswer || '当前题目尚未配置参考答案'" :renderMarkdown="true" :isTyping="false" />
+            </div>
           </div>
         </article>
 
@@ -374,7 +381,7 @@
           </button>
         </div>
 
-        <article v-if="aiStarted" class="mt-4 rounded-3xl border border-black/8 bg-white/84 backdrop-blur-xl p-6 shadow-sm">
+        <article v-if="aiStarted" class="question-ai-card mt-4 rounded-3xl border border-black/8 bg-white/84 backdrop-blur-xl p-6 shadow-sm">
           <div class="text-sm font-semibold text-text-primary mb-3">AI 回答</div>
           <div class="prose prose-sm max-w-none text-text-secondary">
             <TypeWriter :text="aiContent || ''" :renderMarkdown="true" :isTyping="aiStreaming" />
@@ -387,110 +394,132 @@
       </div>
     </section>
 
-    <div v-if="uploadDialogVisible" class="fixed inset-0 z-40 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4">
-      <div class="w-full max-w-lg rounded-3xl border border-border-subtle bg-bg-surface p-6 shadow-2xl">
-        <div class="flex items-start justify-between gap-3">
-          <div>
-            <h3 class="text-lg font-semibold text-text-primary">导入自定义题库</h3>
-            <p class="text-xs text-text-tertiary mt-1">仅支持 `.txt`，提交后会先进入后台审核。</p>
-          </div>
-          <button class="rounded-lg p-1.5 hover:bg-black/[0.04] text-text-tertiary" @click="closeImportDialog">
-            <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-            </svg>
-          </button>
-        </div>
-
-        <div class="mt-5 space-y-4">
-          <label class="block">
-            <span class="text-xs text-text-tertiary">题库名称</span>
-            <input
-              v-model.trim="uploadForm.name"
-              type="text"
-              class="workspace-control mt-1.5 w-full rounded-xl border border-black/10 bg-white px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-ai-from/25"
-              placeholder="不填则默认使用文件名"
-            />
-          </label>
-
-          <div class="grid grid-cols-2 gap-3">
-            <label class="block">
-              <span class="text-xs text-text-tertiary">分类</span>
-              <select
-                v-model="uploadForm.category"
-                class="workspace-control mt-1.5 w-full rounded-xl border border-black/10 bg-white px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-ai-from/25"
-              >
-                <option v-for="cat in categories.filter((item) => item.id !== 'all')" :key="cat.id" :value="cat.id">
-                  {{ cat.name }}
-                </option>
-              </select>
-            </label>
-            <label class="block">
-              <span class="text-xs text-text-tertiary">默认难度</span>
-              <select
-                v-model.number="uploadForm.difficulty"
-                class="workspace-control mt-1.5 w-full rounded-xl border border-black/10 bg-white px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-ai-from/25"
-              >
-                <option :value="1">简单</option>
-                <option :value="2">中等</option>
-                <option :value="3">困难</option>
-              </select>
-            </label>
-          </div>
-
-          <label class="block">
-            <span class="text-xs text-text-tertiary">题库文件</span>
-            <div class="mt-1.5 rounded-2xl border border-dashed border-black/12 bg-black/[0.02] p-4">
-              <input
-                ref="uploadInput"
-                type="file"
-                accept=".txt,text/plain"
-                class="workspace-control block w-full text-sm text-text-secondary file:mr-3 file:rounded-lg file:border-0 file:bg-ai-from/10 file:px-3 file:py-2 file:text-xs file:font-semibold file:text-ai-from hover:file:bg-ai-from/15"
-                @change="handleUploadFileChange"
-              />
-              <p class="mt-2 text-[11px] text-text-tertiary">
-                {{ uploadFile ? `已选择：${uploadFile.name}` : '仅支持 txt，建议控制在 5MB 以内。' }}
-              </p>
-            </div>
-          </label>
-
-          <div class="rounded-2xl border border-black/8 bg-black/[0.02] p-3.5">
-            <div class="flex items-center justify-between gap-3">
-              <p class="text-xs font-semibold text-text-primary">格式要求（严格）</p>
-              <button
-                class="workspace-btn workspace-btn-muted text-[11px] px-2 py-1 rounded-lg border border-black/10 bg-white hover:bg-black/[0.03]"
-                @click="downloadTxtTemplate"
-              >
-                下载模板
+    <transition name="submit-note-fade">
+      <div v-if="uploadDialogVisible" class="submit-note-overlay" @click.self="closeImportDialog">
+        <div class="submit-note-shell">
+          <div class="submit-note-dialog">
+            <div class="submit-note-header">
+              <div class="min-w-0">
+                <div class="flex flex-wrap items-center gap-2">
+                  <h3 class="submit-note-title">导入题库</h3>
+                  <span class="submit-note-badge">发布审核</span>
+                </div>
+                <p class="submit-note-subtitle">
+                  仅支持 `.txt`，提交后会先进入后台审核，通过后即可对外展示。
+                </p>
+              </div>
+              <button class="submit-note-close" @click="closeImportDialog">
+                <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
               </button>
             </div>
-            <p class="mt-2 text-[11px] leading-6 text-text-secondary">
-              每题两段：第一行是题目，下一行起是答案。题目与题目之间空一行。
-            </p>
-            <pre class="mt-2 rounded-lg bg-white border border-black/8 p-2.5 text-[11px] leading-6 text-text-secondary overflow-x-auto">题目：什么是索引失效？
+
+            <div class="submit-note-body custom-scrollbar">
+              <input
+                v-model.trim="uploadForm.name"
+                type="text"
+                class="submit-note-input submit-note-title-input"
+                placeholder="请输入题库名称，不填则默认使用文件名"
+              />
+
+              <div class="grid grid-cols-1 gap-3 md:grid-cols-2">
+                <label class="submit-note-card submit-note-card-compact">
+                  <div class="submit-note-card-head">
+                    <span class="submit-note-label">分类</span>
+                    <span class="submit-note-meta">选择分类</span>
+                  </div>
+                  <select
+                    v-model="uploadForm.category"
+                    class="submit-note-card-input"
+                  >
+                    <option v-for="cat in categories.filter((item) => item.id !== 'all')" :key="cat.id" :value="cat.id">
+                      {{ cat.name }}
+                    </option>
+                  </select>
+                </label>
+
+                <label class="submit-note-card submit-note-card-compact">
+                  <div class="submit-note-card-head">
+                    <span class="submit-note-label">默认难度</span>
+                    <span class="submit-note-meta">选择难度</span>
+                  </div>
+                  <select
+                    v-model.number="uploadForm.difficulty"
+                    class="submit-note-card-input"
+                  >
+                    <option :value="1">简单</option>
+                    <option :value="2">中等</option>
+                    <option :value="3">困难</option>
+                  </select>
+                </label>
+              </div>
+
+              <label class="submit-note-card">
+                <div class="submit-note-card-head">
+                  <span class="submit-note-label">题库文件</span>
+                  <span class="submit-note-meta">上传文件</span>
+                </div>
+                <div class="submit-note-file-drop">
+                  <input
+                    ref="uploadInput"
+                    type="file"
+                    accept=".txt,text/plain"
+                    class="submit-note-file-input"
+                    @change="handleUploadFileChange"
+                  />
+                  <div class="submit-note-file-icon">
+                    <svg class="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                    </svg>
+                  </div>
+                  <p class="submit-note-file-text">
+                    {{ uploadFile ? uploadFile.name : '点击或将文件拖拽到此处上传' }}
+                  </p>
+                  <p class="submit-note-file-hint">仅支持 txt，建议控制在 5MB 以内</p>
+                </div>
+              </label>
+
+              <div class="submit-note-card">
+                <div class="flex items-center justify-between gap-3">
+                  <span class="submit-note-label">格式要求（严格）</span>
+                  <button
+                    class="submit-note-btn submit-note-btn-secondary text-xs px-2 py-1"
+                    @click="downloadTxtTemplate"
+                  >
+                    下载模板
+                  </button>
+                </div>
+                <p class="submit-note-format-desc">
+                  每题两段：第一行是题目，下一行起是答案。题目与题目之间空一行。
+                </p>
+                <pre class="submit-note-format-example">题目：什么是索引失效？
 答案：对索引列做函数计算、隐式类型转换等都可能导致索引失效。
 
 题目：什么是缓存穿透？
 答案：请求的数据不存在，缓存和数据库都没有，导致请求直接打到数据库。</pre>
+              </div>
+            </div>
+
+            <div class="submit-note-footer">
+              <button class="submit-note-btn submit-note-btn-secondary" @click="closeImportDialog">取消</button>
+              <button
+                class="submit-note-btn submit-note-btn-primary"
+                :disabled="uploadingBank"
+                @click="submitImport"
+              >
+                {{ uploadingBank ? '提交中...' : '提交审核' }}
+              </button>
+            </div>
           </div>
         </div>
-
-        <div class="mt-6 flex justify-end gap-2">
-          <button class="workspace-btn workspace-btn-muted px-3 py-2 rounded-xl border border-black/10 text-sm hover:bg-black/[0.03]" @click="closeImportDialog">
-            取消
-          </button>
-          <button
-            class="workspace-btn workspace-btn-primary px-3 py-2 rounded-xl text-sm font-semibold text-white bg-gradient-to-r from-ai-from to-ai-to disabled:opacity-60"
-            :disabled="uploadingBank"
-            @click="submitImport"
-          >
-            {{ uploadingBank ? '提交中...' : '提交审核' }}
-          </button>
-        </div>
       </div>
-    </div>
+    </transition>
 
-    <div v-if="renameDialogVisible" class="fixed inset-0 z-40 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4">
-      <div class="w-full max-w-md rounded-3xl border border-border-subtle bg-bg-surface p-6 shadow-2xl">
+    <div
+      v-if="renameDialogVisible"
+      class="fixed inset-0 z-[180] bg-transparent flex items-center justify-center p-4"
+      @click.self="closeRenameDialog"
+    >
+      <div class="w-full max-w-md rounded-3xl border border-border-subtle bg-[#f4f5fb] dark:bg-[#221c30] p-6 shadow-2xl">
         <div class="flex items-start justify-between gap-3">
           <div>
             <h3 class="text-lg font-semibold text-text-primary">重命名题库</h3>
@@ -530,10 +559,10 @@
 
     <div
       v-if="doneConfirmVisible"
-      class="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4"
+      class="fixed inset-0 z-[180] bg-transparent flex items-center justify-center p-4"
       @click.self="closeDoneConfirmDialog"
     >
-      <div class="w-full max-w-sm rounded-3xl border border-border-subtle bg-bg-surface p-6 shadow-2xl">
+      <div class="w-full max-w-sm rounded-3xl border border-border-subtle bg-[#f4f5fb] dark:bg-[#221c30] p-6 shadow-2xl">
         <h3 class="text-lg font-semibold text-text-primary">是否真会了？</h3>
         <p class="mt-2 text-sm text-text-secondary leading-6">
           确认后会把本题记入你的做题记录，并同步到排行榜统计。
@@ -563,6 +592,7 @@
 import { computed, nextTick, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
 import TypeWriter from '@/components/common/TypeWriter.vue'
 import LoadingDots from '@/components/common/LoadingDots.vue'
+import { useAutoPageRefresh } from '@/composables/useAutoPageRefresh'
 import { useSSE } from '@/composables/useSSE'
 import { api } from '@/composables/useRequest'
 import { useAuthStore } from '@/stores/auth'
@@ -651,6 +681,14 @@ const bankScroller = ref(null)
 const canScrollBankLeft = ref(false)
 const canScrollBankRight = ref(false)
 
+const touchState = reactive({
+  startX: 0,
+  startY: 0,
+  deltaX: 0,
+  deltaY: 0,
+  ignore: false,
+})
+
 const currentBank = computed(() => customBanks.value.find((item) => item.id === currentBankId.value) || null)
 const isCurrentBankReady = computed(() => !currentBank.value || Number(currentBank.value.status) === 1)
 const safeAiError = computed(() => {
@@ -736,6 +774,7 @@ const normalizeCategoryDisplayName = (code, name = '') => {
 }
 const defaultImportCategory = () => categories.value.find((item) => item.id !== 'all')?.id || 'java'
 const hasCategoryCode = (code) => categories.value.some((item) => item.id === code)
+const isMobileViewport = () => window.innerWidth < 768
 
 const applyCategoryOptions = (rows) => {
   const next = [{ id: 'all', name: '全部分类' }]
@@ -840,6 +879,58 @@ const syncCategoryToSelectedBank = () => {
     const normalized = normalizeCategoryCode(currentBank.value.category)
     currentCategory.value = hasCategoryCode(normalized) ? normalized : 'all'
   }
+}
+
+const resetTouchState = () => {
+  touchState.startX = 0
+  touchState.startY = 0
+  touchState.deltaX = 0
+  touchState.deltaY = 0
+  touchState.ignore = false
+}
+
+const hasBlockingOverlay = () => uploadDialogVisible.value || renameDialogVisible.value || doneConfirmVisible.value
+
+const handleTouchStart = (event) => {
+  if (!isMobileViewport() || hasBlockingOverlay()) {
+    resetTouchState()
+    return
+  }
+  const target = event.target instanceof Element ? event.target : null
+  touchState.ignore = !!target?.closest?.('input, textarea, select, .bank-scroll-area, [data-swipe-lock]')
+  const touch = event.touches?.[0]
+  if (!touch) return
+  touchState.startX = touch.clientX
+  touchState.startY = touch.clientY
+  touchState.deltaX = 0
+  touchState.deltaY = 0
+}
+
+const handleTouchMove = (event) => {
+  if (touchState.ignore) return
+  const touch = event.touches?.[0]
+  if (!touch) return
+  touchState.deltaX = touch.clientX - touchState.startX
+  touchState.deltaY = touch.clientY - touchState.startY
+}
+
+const handleTouchEnd = () => {
+  if (!isMobileViewport() || touchState.ignore) {
+    resetTouchState()
+    return
+  }
+  const absX = Math.abs(touchState.deltaX)
+  const absY = Math.abs(touchState.deltaY)
+  if (absX < 72 || absX < absY * 1.2) {
+    resetTouchState()
+    return
+  }
+  if (touchState.deltaX < 0 && mobileTab.value === 'list' && activeQuestion.value) {
+    mobileTab.value = 'detail'
+  } else if (touchState.deltaX > 0 && mobileTab.value === 'detail') {
+    mobileTab.value = 'list'
+  }
+  resetTouchState()
 }
 
 const updateBankNavState = () => {
@@ -1389,12 +1480,20 @@ const handleWindowResize = () => {
   updateBankNavState()
 }
 
-onMounted(async () => {
+const refreshQuestionBankData = async () => {
   await fetchCategoryOptions()
   await fetchCustomBanks()
   syncCategoryToSelectedBank()
-  await fetchQuestions(1)
+  await fetchQuestions(currentPage.value || 1)
   await loadDoneFromServer()
+}
+
+useAutoPageRefresh(refreshQuestionBankData, {
+  throttleMs: 5000,
+})
+
+onMounted(async () => {
+  await refreshQuestionBankData()
   await nextTick()
   updateBankNavState()
   window.addEventListener('resize', handleWindowResize)
@@ -1408,6 +1507,56 @@ onUnmounted(() => {
 <style scoped>
 .question-bank-shell {
   background: var(--app-shell-bg);
+  min-height: 0;
+}
+
+.question-list-scroll,
+.question-detail-scroll {
+  min-height: 0;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+  touch-action: pan-y;
+}
+
+.question-detail-surface {
+  background:
+    radial-gradient(circle at 72% 14%, color-mix(in srgb, var(--module-glow-a) 44%, transparent), transparent 36%),
+    radial-gradient(circle at 22% 78%, color-mix(in srgb, var(--module-glow-c) 40%, transparent), transparent 34%),
+    var(--bg-base);
+}
+
+.question-detail-stack {
+  display: flex;
+  flex-direction: column;
+  padding-bottom: clamp(22px, 4vh, 44px);
+}
+
+.question-content-card,
+.question-answer-card,
+.question-ai-card,
+.question-empty-card {
+  border-color: var(--border-soft);
+  background: color-mix(in srgb, var(--bg-elevated) 92%, white 8%);
+  box-shadow: var(--shadow-base);
+}
+
+.question-answer-card {
+  min-height: clamp(300px, 44vh, 480px);
+  display: flex;
+  flex-direction: column;
+}
+
+.answer-body {
+  flex: 1;
+}
+
+.question-empty-wrap {
+  max-width: 560px;
+}
+
+.question-empty-icon {
+  background: color-mix(in srgb, var(--bg-elevated) 88%, white 12%);
+  border-color: var(--border-soft);
 }
 
 .custom-scrollbar::-webkit-scrollbar {
@@ -1517,16 +1666,25 @@ onUnmounted(() => {
 
 .question-bank-shell :deep([class~='bg-slate-50']),
 .question-bank-shell :deep([class~='bg-slate-100']),
-.question-bank-shell :deep([class~='bg-black/[0.03]']) {
+.question-bank-shell :deep([class~='bg-black/[0.03]']),
+.question-bank-shell :deep([class~='bg-black/[0.02]']),
+.question-bank-shell :deep([class~='bg-white']),
+.question-bank-shell :deep([class~='bg-white/84']),
+.question-bank-shell :deep([class~='bg-white/82']),
+.question-bank-shell :deep([class~='bg-white/80']),
+.question-bank-shell :deep([class~='bg-white/70']) {
   background: var(--bg-elevated) !important;
 }
 
 .question-bank-shell :deep([class~='text-slate-400']),
 .question-bank-shell :deep([class~='text-slate-500']),
-.question-bank-shell :deep([class~='text-slate-600']),
+.question-bank-shell :deep([class~='text-slate-600']) {
+  color: var(--text-secondary) !important;
+}
+
 .question-bank-shell :deep([class~='text-slate-700']),
 .question-bank-shell :deep([class~='text-slate-800']) {
-  color: var(--text-secondary) !important;
+  color: var(--text-primary) !important;
 }
 
 .question-bank-shell :deep([class~='text-amber-700']) {
@@ -1539,11 +1697,502 @@ onUnmounted(() => {
 
 .question-bank-shell :deep([class~='border-amber-100']),
 .question-bank-shell :deep([class~='border-gray-200']),
-.question-bank-shell :deep([class~='border-slate-200']) {
+.question-bank-shell :deep([class~='border-slate-200']),
+.question-bank-shell :deep([class~='border-black/10']),
+.question-bank-shell :deep([class~='border-black/8']),
+.question-bank-shell :deep([class~='border-black/[0.05]']),
+.question-bank-shell :deep([class~='border-black/[0.03]']),
+.question-bank-shell :deep([class~='border-black/[0.02]']) {
   border-color: var(--border-soft) !important;
 }
 
+.dark .question-content-card,
+.dark .question-answer-card,
+.dark .question-ai-card,
+.dark .question-empty-card {
+  background:
+    radial-gradient(circle at 92% 100%, color-mix(in srgb, var(--module-glow-a) 36%, transparent), transparent 38%),
+    color-mix(in srgb, var(--bg-elevated) 94%, #0f172a 6%);
+}
+
+.submit-note-overlay {
+  --submit-bg-page: #f6f7fb;
+  --submit-bg-modal: rgba(255, 255, 255, 0.78);
+  --submit-bg-card: rgba(255, 255, 255, 0.62);
+  --submit-bg-input: rgba(250, 250, 252, 0.9);
+  --submit-bg-soft: rgba(246, 247, 251, 0.86);
+  --submit-border-light: rgba(202, 207, 216, 0.28);
+  --submit-border-soft: rgba(214, 218, 226, 0.42);
+  --submit-divider: rgba(225, 228, 235, 0.72);
+  --submit-text-primary: #2b2f38;
+  --submit-text-secondary: #6f7684;
+  --submit-text-tertiary: #a2a8b5;
+  --submit-text-placeholder: #b7bcc8;
+  --submit-brand: #e79ab0;
+  --submit-brand-hover: #dc89a3;
+  --submit-brand-soft: rgba(231, 154, 176, 0.12);
+  --submit-brand-border: rgba(231, 154, 176, 0.22);
+  --submit-accent-blue: #a8bfdc;
+  --submit-accent-lilac: #c8c2dc;
+  --submit-accent-silver: #d8dde7;
+  --submit-ease: cubic-bezier(0.22, 1, 0.36, 1);
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  background: rgba(96, 103, 116, 0.24);
+}
+
+.dark .submit-note-overlay {
+  --submit-bg-page: #15111e;
+  --submit-bg-modal: rgba(22, 18, 32, 0.88);
+  --submit-bg-card: rgba(34, 28, 47, 0.8);
+  --submit-bg-input: rgba(28, 22, 40, 0.94);
+  --submit-bg-soft: rgba(22, 18, 32, 0.92);
+  --submit-border-light: rgba(255, 255, 255, 0.08);
+  --submit-border-soft: rgba(255, 255, 255, 0.14);
+  --submit-divider: rgba(255, 255, 255, 0.08);
+  --submit-text-primary: #f3eefb;
+  --submit-text-secondary: #c0b5d0;
+  --submit-text-tertiary: #958aa7;
+  --submit-text-placeholder: #7d738f;
+  --submit-brand: #d7bfdc;
+  --submit-brand-hover: #e6c6d8;
+  --submit-brand-soft: rgba(215, 191, 220, 0.14);
+  --submit-brand-border: rgba(215, 191, 220, 0.22);
+  --submit-accent-blue: #9ab1d5;
+  --submit-accent-lilac: #b8aad7;
+  --submit-accent-silver: #9e9bb7;
+  background: rgba(9, 7, 15, 0.58);
+}
+
+.dark .submit-note-dialog,
+.dark .submit-note-card,
+.dark .submit-note-file-drop,
+.dark .submit-note-format-example {
+  box-shadow: 0 24px 54px rgba(0, 0, 0, 0.28);
+}
+
+.dark .submit-note-header,
+.dark .submit-note-footer {
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.03), rgba(255, 255, 255, 0));
+}
+
+.dark .submit-note-close {
+  background: rgba(32, 26, 45, 0.88);
+  color: var(--submit-text-secondary);
+}
+
+.dark .submit-note-card:hover,
+.dark .submit-note-close:hover,
+.dark .submit-note-file-drop:hover {
+  background: rgba(38, 31, 52, 0.94);
+}
+
+.submit-note-shell {
+  display: flex;
+  min-height: 100%;
+  width: 100%;
+  align-items: center;
+  justify-content: center;
+}
+
+.submit-note-dialog {
+  width: 100%;
+  max-width: 700px;
+  max-height: calc(100dvh - 56px);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border: 1px solid var(--border-subtle);
+  border-radius: 28px;
+  background: var(--submit-bg-page);
+  box-shadow: 0 28px 80px -42px rgba(43, 47, 56, 0.24), 0 18px 36px -30px rgba(43, 47, 56, 0.12);
+  will-change: transform, opacity;
+}
+
+.submit-note-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 20px 22px 16px;
+  border-bottom: 1px solid var(--submit-divider);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.22), rgba(255, 255, 255, 0));
+}
+
+.submit-note-title {
+  font-size: 23px;
+  line-height: 1.1;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: var(--submit-text-primary);
+}
+
+.submit-note-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 26px;
+  padding: 0 10px;
+  border: 1px solid var(--submit-brand-border);
+  border-radius: 999px;
+  background: linear-gradient(180deg, rgba(231, 154, 176, 0.13), rgba(231, 154, 176, 0.08));
+  color: #b37790;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+}
+
+.submit-note-subtitle {
+  margin-top: 8px;
+  font-size: 12.5px;
+  line-height: 1.7;
+  color: var(--submit-text-secondary);
+}
+
+.submit-note-close {
+  display: inline-flex;
+  height: 36px;
+  width: 36px;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--submit-border-light);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.48);
+  color: var(--submit-text-tertiary);
+  transition:
+    background 0.2s var(--submit-ease),
+    color 0.2s var(--submit-ease),
+    transform 0.2s var(--submit-ease),
+    box-shadow 0.2s var(--submit-ease),
+    border-color 0.2s var(--submit-ease);
+}
+
+.submit-note-close:hover {
+  background: rgba(255, 255, 255, 0.88);
+  color: var(--submit-text-secondary);
+  border-color: var(--submit-border-soft);
+  transform: translateY(-1px);
+  box-shadow: 0 10px 22px -18px rgba(43, 47, 56, 0.22);
+}
+
+.submit-note-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 16px 22px 18px;
+}
+
+.submit-note-input,
+.submit-note-card-input,
+.submit-note-textarea {
+  width: 100%;
+  border: 1px solid var(--submit-border-light);
+  background: var(--submit-bg-input);
+  color: var(--submit-text-primary);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.78),
+    0 12px 24px -26px rgba(43, 47, 56, 0.16);
+  transition:
+    border-color 0.2s var(--submit-ease),
+    box-shadow 0.2s var(--submit-ease),
+    background 0.2s var(--submit-ease);
+  border-radius: 16px;
+  padding: 0 16px;
+  font-size: 14px;
+  outline: none;
+}
+
+.submit-note-input::placeholder,
+.submit-note-card-input::placeholder,
+.submit-note-textarea::placeholder {
+  color: var(--submit-text-placeholder);
+}
+
+.submit-note-input:hover,
+.submit-note-card-input:hover,
+.submit-note-textarea:hover {
+  border-color: var(--submit-border-soft);
+  background: rgba(255, 255, 255, 0.94);
+}
+
+.submit-note-input:focus,
+.submit-note-card-input:focus,
+.submit-note-textarea:focus {
+  border-color: var(--submit-brand-border);
+  background: rgba(255, 255, 255, 0.96);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.82),
+    0 12px 28px -24px rgba(231, 154, 176, 0.28),
+    0 0 0 4px rgba(231, 154, 176, 0.1);
+}
+
+.submit-note-title-input {
+  font-size: 16px;
+  font-weight: 600;
+  min-height: 48px;
+  padding: 0 18px;
+}
+
+.submit-note-card {
+  display: flex;
+  min-height: 112px;
+  flex-direction: column;
+  justify-content: space-between;
+  border: 1px solid var(--submit-border-light);
+  border-radius: 20px;
+  background: var(--submit-bg-card);
+  padding: 12px 14px;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.78),
+    0 14px 26px -28px rgba(43, 47, 56, 0.12);
+  transition:
+    border-color 0.2s var(--submit-ease),
+    box-shadow 0.2s var(--submit-ease),
+    transform 0.2s var(--submit-ease),
+    background 0.2s var(--submit-ease);
+}
+
+.submit-note-card:hover {
+  border-color: var(--submit-border-soft);
+  background: rgba(255, 255, 255, 0.7);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.82),
+    0 20px 34px -30px rgba(43, 47, 56, 0.16);
+  transform: translateY(-1px);
+}
+
+.submit-note-card-compact {
+  gap: 10px;
+}
+
+.submit-note-card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.submit-note-label {
+  display: inline-flex;
+  align-items: center;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--submit-text-secondary);
+  letter-spacing: 0.02em;
+}
+
+.submit-note-meta {
+  font-size: 11px;
+  color: var(--submit-text-tertiary);
+}
+
+.submit-note-card-input {
+  min-height: 42px;
+  border-radius: 16px;
+  padding: 0 14px;
+  font-size: 14px;
+}
+
+.submit-note-file-drop {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  border: 1px dashed var(--submit-border-soft);
+  border-radius: 18px;
+  background: var(--submit-bg-soft);
+  padding: 24px;
+  cursor: pointer;
+  transition:
+    border-color 0.2s var(--submit-ease),
+    background 0.2s var(--submit-ease);
+}
+
+.submit-note-file-drop:hover {
+  border-color: var(--submit-brand-border);
+  background: rgba(255, 255, 255, 0.74);
+}
+
+.submit-note-file-input {
+  pointer-events: none;
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.submit-note-file-icon {
+  color: var(--submit-text-tertiary);
+}
+
+.submit-note-file-text {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--submit-text-primary);
+  text-align: center;
+}
+
+.submit-note-file-hint {
+  font-size: 12px;
+  color: var(--submit-text-tertiary);
+}
+
+.submit-note-format-desc {
+  margin-top: 12px;
+  font-size: 12px;
+  line-height: 1.7;
+  color: var(--submit-text-secondary);
+}
+
+.submit-note-format-example {
+  margin-top: 10px;
+  border-radius: 12px;
+  border: 1px solid var(--submit-border-light);
+  background: rgba(255, 255, 255, 0.78);
+  padding: 14px;
+  font-size: 11px;
+  line-height: 1.7;
+  color: var(--submit-text-secondary);
+  overflow-x: auto;
+  white-space: pre-wrap;
+}
+
+.submit-note-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  padding: 14px 22px 16px;
+  border-top: 1px solid var(--submit-divider);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0), rgba(255, 255, 255, 0.16));
+}
+
+.submit-note-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;
+  min-width: 96px;
+  border-radius: 14px;
+  padding: 0 20px;
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  transition:
+    transform 0.2s var(--submit-ease),
+    box-shadow 0.2s var(--submit-ease),
+    background 0.2s var(--submit-ease);
+  cursor: pointer;
+}
+
+.submit-note-btn-secondary {
+  border: 1px solid var(--submit-border-light);
+  background: rgba(255, 255, 255, 0.64);
+  color: var(--submit-text-secondary);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.82),
+    0 8px 18px -16px rgba(43, 47, 56, 0.14);
+}
+
+.submit-note-btn-secondary:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.88);
+  border-color: var(--submit-border-soft);
+  transform: translateY(-1px);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.82),
+    0 14px 24px -18px rgba(43, 47, 56, 0.18);
+}
+
+.submit-note-btn-primary {
+  border: 1px solid rgba(255, 169, 181, 0.44);
+  background: linear-gradient(135deg, #ffa9b5, #f6a4b1);
+  color: #fff;
+  box-shadow:
+    0 18px 30px -22px rgba(255, 169, 181, 0.34),
+    inset 0 1px 0 rgba(255, 255, 255, 0.22);
+}
+
+.submit-note-btn-primary:hover:not(:disabled) {
+  background: linear-gradient(135deg, #ff9ead, #f19fad);
+  box-shadow: 0 22px 36px -22px rgba(255, 169, 181, 0.4);
+}
+
+.dark .submit-note-input:hover,
+.dark .submit-note-card-input:hover,
+.dark .submit-note-textarea:hover,
+.dark .submit-note-card:hover,
+.dark .submit-note-file-drop:hover,
+.dark .submit-note-btn-secondary,
+.dark .submit-note-format-example {
+  background: rgba(34, 28, 47, 0.92);
+}
+
+.dark .submit-note-input:focus,
+.dark .submit-note-card-input:focus,
+.dark .submit-note-textarea:focus {
+  background: rgba(40, 33, 55, 0.98);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.06),
+    0 0 0 4px rgba(215, 191, 220, 0.12),
+    0 16px 30px -28px rgba(0, 0, 0, 0.42);
+}
+
+.dark .submit-note-btn-secondary {
+  color: var(--submit-text-secondary);
+  border-color: var(--submit-border-soft);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05);
+}
+
+.dark .submit-note-btn-secondary:hover:not(:disabled) {
+  background: rgba(42, 35, 58, 0.96);
+}
+
+.submit-note-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.submit-note-fade-enter-active,
+.submit-note-fade-leave-active {
+  transition: opacity 0.34s var(--submit-ease), backdrop-filter 0.34s var(--submit-ease);
+}
+
+.submit-note-fade-enter-active .submit-note-dialog,
+.submit-note-fade-leave-active .submit-note-dialog {
+  transition:
+    opacity 0.34s var(--submit-ease),
+    transform 0.34s var(--submit-ease),
+    box-shadow 0.34s var(--submit-ease);
+}
+
+.submit-note-fade-enter-from,
+.submit-note-fade-leave-to {
+  opacity: 0;
+  backdrop-filter: blur(0);
+}
+
+.submit-note-fade-enter-from .submit-note-dialog,
+.submit-note-fade-leave-to .submit-note-dialog {
+  opacity: 0;
+  transform: translateY(16px) scale(0.985);
+  box-shadow: 0 10px 30px -24px rgba(43, 47, 56, 0.1);
+}
+
 @media (max-width: 767px) {
+  .question-bank-shell > aside,
+  .question-bank-shell > section {
+    min-height: 0;
+  }
+
+  .question-detail-stack {
+    padding: 20px 16px 28px;
+  }
+
   .bank-card,
   .bank-empty-card {
     min-width: 168px;
@@ -1555,6 +2204,94 @@ onUnmounted(() => {
   .bank-card:hover {
     transform: none;
     box-shadow: none;
+  }
+
+  .submit-note-overlay {
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    padding:
+      max(86px, calc(env(safe-area-inset-top) + 76px))
+      10px
+      max(28px, calc(env(safe-area-inset-bottom) + 22px));
+  }
+
+  .submit-note-shell {
+    align-items: flex-start;
+    min-height: 100%;
+    padding-bottom: calc(env(safe-area-inset-bottom) + 12px);
+  }
+
+  .submit-note-dialog {
+    max-width: min(100%, 640px);
+    width: min(100%, calc(100vw - 20px));
+    max-height: calc(100svh - 128px - env(safe-area-inset-bottom));
+    margin-bottom: calc(env(safe-area-inset-bottom) + 8px);
+    border-radius: 22px;
+  }
+
+  .submit-note-header,
+  .submit-note-body,
+  .submit-note-footer {
+    padding-left: 14px;
+    padding-right: 14px;
+  }
+
+  .submit-note-header {
+    padding-top: 16px;
+    padding-bottom: 14px;
+  }
+
+  .submit-note-title {
+    font-size: 21px;
+  }
+
+  .submit-note-subtitle {
+    font-size: 12px;
+    line-height: 1.6;
+  }
+
+  .submit-note-body {
+    padding-top: 14px;
+    padding-bottom: 16px;
+  }
+
+  .submit-note-footer {
+    flex-wrap: wrap;
+    padding-top: 12px;
+    padding-bottom: calc(18px + env(safe-area-inset-bottom));
+    position: relative;
+    z-index: 1;
+  }
+
+  .submit-note-close {
+    flex-shrink: 0;
+  }
+
+  .submit-note-btn {
+    flex: 1 1 auto;
+    min-height: 42px;
+  }
+
+  .submit-note-title-input {
+    min-height: 44px;
+    font-size: 15px;
+  }
+
+  .submit-note-card {
+    min-height: 100px;
+    padding: 11px 12px;
+  }
+
+  .submit-note-file-drop {
+    padding: 18px 14px;
+  }
+
+  .submit-note-card-head {
+    align-items: flex-start;
+  }
+
+  .submit-note-format-example {
+    max-height: 180px;
   }
 }
 </style>

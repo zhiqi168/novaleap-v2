@@ -1,28 +1,33 @@
-/**
- * useRequest — 管理端统一 API 请求封装
- * 提供 JWT 鉴权头注入、统一错误处理、401 自动跳转
- */
-const BASE_URL = ''  // 开发环境通过 Vite 代理
+import { clearAdminToken, getAdminToken } from '@/composables/adminAuthStorage'
 
-/**
- * 通用请求函数
- */
+const BASE_URL = String(import.meta.env.VITE_API_BASE_URL || '').trim().replace(/\/+$/, '')
+
+function normalizeUrl(url) {
+  const raw = String(url || '').trim()
+  if (!raw) return '/'
+  if (/^https?:\/\//i.test(raw)) {
+    return raw
+  }
+  return raw.startsWith('/') ? raw : `/${raw}`
+}
+
 async function request(url, options = {}) {
-  const token = localStorage.getItem('nova_admin_token')
+  const token = getAdminToken()
   const isFormData = options.body instanceof FormData
 
   const headers = {
     ...options.headers,
   }
+
   if (!isFormData) {
     headers['Content-Type'] = headers['Content-Type'] || 'application/json'
   }
 
   if (token) {
-    headers['Authorization'] = `Bearer ${token}`
+    headers.Authorization = `Bearer ${token}`
   }
 
-  const response = await fetch(`${BASE_URL}${url}`, {
+  const response = await fetch(`${BASE_URL}${normalizeUrl(url)}`, {
     ...options,
     headers,
     body: options.body
@@ -32,17 +37,16 @@ async function request(url, options = {}) {
 
   if (!response.ok) {
     if (response.status === 401 || response.status === 403) {
-      localStorage.removeItem('nova_admin_token')
+      clearAdminToken()
       window.location.href = '/login'
     }
     const errorData = await response.json().catch(() => ({}))
-    throw new Error(errorData.msg || `请求失败: HTTP ${response.status}`)
+    throw new Error(errorData.msg || `Request failed: HTTP ${response.status}`)
   }
 
   return response.json()
 }
 
-// 导出便捷方法
 export const api = {
   get: (url) => request(url, { method: 'GET' }),
   post: (url, body) => request(url, { method: 'POST', body }),

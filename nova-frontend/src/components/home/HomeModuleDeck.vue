@@ -36,11 +36,11 @@ defineProps({
 }
 
 .deck-card {
-  border-radius: 30px;
-  border: 1px solid rgba(255, 255, 255, 0.76);
+  border-radius: var(--radius-xl);
+  border: 1px solid var(--border-soft);
   background: rgba(255, 255, 255, 0.62);
-  box-shadow: 0 18px 46px rgba(37, 29, 44, 0.07);
-  backdrop-filter: blur(18px);
+  box-shadow: var(--shadow-base);
+  backdrop-filter: blur(8px);
   padding: 26px 24px;
   min-height: 144px;
   transition:
@@ -51,7 +51,7 @@ defineProps({
 
 .deck-card:hover {
   transform: translateY(-5px);
-  box-shadow: 0 26px 62px rgba(37, 29, 44, 0.11);
+  box-shadow: var(--shadow-hover);
   background: rgba(255, 255, 255, 0.78);
 }
 

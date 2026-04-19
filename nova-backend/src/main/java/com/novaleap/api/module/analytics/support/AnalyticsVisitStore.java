@@ -8,6 +8,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 
 import java.nio.charset.StandardCharsets;
+import java.time.Duration;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
@@ -31,6 +32,12 @@ public class AnalyticsVisitStore {
     private static final int GEO_RECENT_MAX = 300;
     public static final String VISITOR_LAST_SEEN_ZSET_KEY = KEY_PREFIX + "visitor:last-seen";
     private static final String VISITOR_PROFILE_PREFIX = KEY_PREFIX + "visitor:profile:";
+    private static final String VISITOR_CLEANUP_LOCK_KEY = KEY_PREFIX + "visitor:cleanup:lock";
+    private static final Duration GEO_DAY_TTL = Duration.ofDays(90);
+    private static final Duration GEO_RECENT_TTL = Duration.ofDays(14);
+    private static final Duration VISITOR_PROFILE_TTL = Duration.ofDays(30);
+    private static final Duration VISITOR_RETENTION = Duration.ofDays(30);
+    private static final Duration VISITOR_CLEANUP_LOCK_TTL = Duration.ofHours(6);
 
     private final StringRedisTemplate redisTemplate;
     private final ObjectMapper objectMapper;
@@ -48,6 +55,8 @@ public class AnalyticsVisitStore {
         redisTemplate.opsForZSet().incrementScore(GEO_CITY_TOTAL_KEY, city, 1D);
         redisTemplate.opsForZSet().incrementScore(GEO_REGION_DAY_PREFIX + day, region, 1D);
         redisTemplate.opsForZSet().incrementScore(GEO_CITY_DAY_PREFIX + day, city, 1D);
+        redisTemplate.expire(GEO_REGION_DAY_PREFIX + day, GEO_DAY_TTL);
+        redisTemplate.expire(GEO_CITY_DAY_PREFIX + day, GEO_DAY_TTL);
 
         Map<String, Object> visit = new LinkedHashMap<>();
         visit.put("time", LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
@@ -61,6 +70,7 @@ public class AnalyticsVisitStore {
             String raw = objectMapper.writeValueAsString(visit);
             redisTemplate.opsForList().leftPush(GEO_RECENT_LIST_KEY, raw);
             redisTemplate.opsForList().trim(GEO_RECENT_LIST_KEY, 0, GEO_RECENT_MAX - 1);
+            redisTemplate.expire(GEO_RECENT_LIST_KEY, GEO_RECENT_TTL);
         } catch (Exception ignore) {
         }
     }
@@ -94,6 +104,8 @@ public class AnalyticsVisitStore {
         redisTemplate.opsForHash().put(profileKey, "lastSeenAt", now);
         redisTemplate.opsForHash().putIfAbsent(profileKey, "firstSeenAt", now);
         redisTemplate.opsForHash().increment(profileKey, "visitCount", 1);
+        redisTemplate.expire(profileKey, VISITOR_PROFILE_TTL);
+        cleanupExpiredVisitors();
     }
 
     public Set<ZSetOperations.TypedTuple<String>> loadOrderedVisitors() {
@@ -179,6 +191,26 @@ public class AnalyticsVisitStore {
     private String visitorProfileKey(String identity) {
         String encoded = Base64.getUrlEncoder().withoutPadding().encodeToString(identity.getBytes(StandardCharsets.UTF_8));
         return VISITOR_PROFILE_PREFIX + encoded;
+    }
+
+    private void cleanupExpiredVisitors() {
+        Boolean locked = redisTemplate.opsForValue().setIfAbsent(VISITOR_CLEANUP_LOCK_KEY, "1", VISITOR_CLEANUP_LOCK_TTL);
+        if (!Boolean.TRUE.equals(locked)) {
+            return;
+        }
+
+        long cutoff = System.currentTimeMillis() - VISITOR_RETENTION.toMillis();
+        Set<String> staleIdentities = redisTemplate.opsForZSet().rangeByScore(VISITOR_LAST_SEEN_ZSET_KEY, 0, cutoff, 0, 200);
+        if (staleIdentities == null || staleIdentities.isEmpty()) {
+            return;
+        }
+        for (String identity : staleIdentities) {
+            if (!hasText(identity)) {
+                continue;
+            }
+            redisTemplate.opsForZSet().remove(VISITOR_LAST_SEEN_ZSET_KEY, identity);
+            redisTemplate.delete(visitorProfileKey(identity));
+        }
     }
 
     private String safeIp(String ipAddress) {

@@ -5,6 +5,7 @@ import com.novaleap.api.common.exception.ForbiddenException;
 import com.novaleap.api.common.exception.UnauthorizedException;
 import com.novaleap.api.entity.User;
 import com.novaleap.api.mapper.UserMapper;
+import com.novaleap.api.module.auth.support.AuthRoleSupport;
 import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
@@ -13,9 +14,11 @@ import org.springframework.util.StringUtils;
 public class CurrentUserService {
 
     private final UserMapper userMapper;
+    private final AuthRoleSupport authRoleSupport;
 
-    public CurrentUserService(UserMapper userMapper) {
+    public CurrentUserService(UserMapper userMapper, AuthRoleSupport authRoleSupport) {
         this.userMapper = userMapper;
+        this.authRoleSupport = authRoleSupport;
     }
 
     public CurrentUser current(Authentication authentication) {
@@ -26,9 +29,10 @@ public class CurrentUserService {
         if (!StringUtils.hasText(username) || "anonymousUser".equals(username)) {
             return new CurrentUser("", "ANONYMOUS", true, false, false);
         }
-        boolean admin = hasRole(authentication, "ADMIN");
-        boolean guest = hasRole(authentication, "GUEST");
-        String role = admin ? "ADMIN" : guest ? "GUEST" : "USER";
+
+        String role = authRoleSupport.resolveRole(authentication);
+        boolean guest = "GUEST".equalsIgnoreCase(role);
+        boolean admin = authRoleSupport.hasAdminAuthority(authentication);
         return new CurrentUser(username, role, false, guest, admin);
     }
 
@@ -86,15 +90,6 @@ public class CurrentUserService {
             return new ActorIdentity("guest", currentUser.safeUsername());
         }
         return new ActorIdentity("user", currentUser.safeUsername());
-    }
-
-    private boolean hasRole(Authentication authentication, String role) {
-        if (authentication == null || authentication.getAuthorities() == null || !StringUtils.hasText(role)) {
-            return false;
-        }
-        String authority = "ROLE_" + role.trim().toUpperCase();
-        return authentication.getAuthorities().stream()
-                .anyMatch(item -> authority.equalsIgnoreCase(item.getAuthority()));
     }
 
     private String safe(String value) {

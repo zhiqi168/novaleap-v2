@@ -7,8 +7,10 @@ import com.novaleap.api.module.ai.dto.AiNoteSummaryRequest;
 import com.novaleap.api.module.ai.dto.AiResumeAnalyzeRequest;
 import com.novaleap.api.module.ai.vo.AiCoachHistoryItemVO;
 import com.novaleap.api.module.ai.vo.AiCoachSessionVO;
+import com.novaleap.api.entity.User;
 import com.novaleap.api.module.system.security.CurrentUser;
 import com.novaleap.api.module.system.security.CurrentUserService;
+import com.novaleap.api.module.system.web.ClientRequestService;
 import com.novaleap.api.service.AiService;
 import com.novaleap.api.service.QuestionAccessSupport;
 import jakarta.servlet.http.HttpServletRequest;
@@ -37,15 +39,18 @@ public class AiController {
     private final AiService aiService;
     private final QuestionAccessSupport questionAccessSupport;
     private final CurrentUserService currentUserService;
+    private final ClientRequestService clientRequestService;
 
     public AiController(
             AiService aiService,
             QuestionAccessSupport questionAccessSupport,
-            CurrentUserService currentUserService
+            CurrentUserService currentUserService,
+            ClientRequestService clientRequestService
     ) {
         this.aiService = aiService;
         this.questionAccessSupport = questionAccessSupport;
         this.currentUserService = currentUserService;
+        this.clientRequestService = clientRequestService;
     }
 
     @GetMapping("/question/{id}/explain")
@@ -77,6 +82,14 @@ public class AiController {
     ) {
         String username = currentUserService.requireUsername(authentication);
         return Result.success(AiViewAssembler.toCoachHistory(aiService.getCoachHistory(username, limit == null ? 40 : limit)));
+    }
+
+    @GetMapping("/quote/daily")
+    public Result<String> dailyQuote(Authentication authentication, HttpServletRequest request) {
+        String identifier = resolveIdentifier(authentication, request);
+        User user = currentUserService.loadDatabaseUser(authentication);
+        String nickname = user == null ? "" : safe(user.getNickname());
+        return Result.success(aiService.generateDailyQuote(identifier, nickname));
     }
 
     @PostMapping("/coach/session/new")
@@ -118,18 +131,8 @@ public class AiController {
         if (currentUser.isAuthenticated()) {
             return currentUser.safeUsername();
         }
-        return extractClientIp(request);
-    }
-
-    private String extractClientIp(HttpServletRequest request) {
-        if (request == null) {
-            return "unknown";
-        }
-        String xff = request.getHeader("X-Forwarded-For");
-        if (hasText(xff)) {
-            return xff.split(",")[0].trim();
-        }
-        return request.getRemoteAddr();
+        String clientIp = clientRequestService.resolveClientIp(request);
+        return hasText(clientIp) ? clientIp : "unknown";
     }
 
     private boolean hasText(String value) {

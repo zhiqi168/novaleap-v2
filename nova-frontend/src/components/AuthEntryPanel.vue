@@ -227,7 +227,7 @@ const handleQqLogin = async () => {
 .register-panel {
   width: min(420px, 92vw);
   height: 100%;
-  background: linear-gradient(180deg, #f8fbff, #fdf9ff 55%, #fff);
+  background: linear-gradient(180deg, #f3f5fa, #eff1f6 55%, #fff);
   box-shadow: -24px 0 60px rgba(15, 23, 42, 0.18);
   padding: 28px 24px;
   display: flex;

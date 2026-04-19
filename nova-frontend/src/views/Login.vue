@@ -1,22 +1,62 @@
 <template>
-  <div class="relative w-screen h-[100dvh] overflow-hidden flex items-center justify-center font-sans tracking-wide">
+  <div class="relative w-screen h-[100dvh] overflow-hidden flex items-center justify-center font-sans tracking-wide" :class="loginThemeClass">
     
     <!-- 背景炫彩装饰块，提供柔和的色彩层次感 -->
+    <div v-if="showMediaBackground" class="absolute inset-0 z-0 overflow-hidden" :class="loginBackgroundClass">
+      <video
+        :src="customBackgroundVideo"
+        class="h-full w-full object-cover object-center select-none"
+        :class="loginBackgroundVideoClass"
+        autoplay
+        muted
+        loop
+        playsinline
+        preload="metadata"
+        disablepictureinpicture
+      ></video>
+
+      <!-- Legacy image / overlay background branch retained for rollback reference only.
+      <img
+        :src="customBackgroundImage"
+        alt=""
+        class="h-full w-full object-cover object-center select-none"
+        :class="loginBackgroundImageClass"
+        draggable="false"
+      />
+      <div class="absolute inset-0" :class="loginBackgroundOverlayClass"></div>
+      <div class="absolute inset-0" :class="loginBackgroundToneClass"></div>
+      -->
+    </div>
+
+    <!-- Legacy gradient fallback retained for rollback reference only.
     <div class="absolute inset-0 z-0 bg-[#F6F1F8]">
       <div class="absolute top-[-15%] left-[-10%] w-[60%] h-[70%] bg-[#D4D5F8] rounded-full filter blur-[120px] opacity-60"></div>
       <div class="absolute top-[20%] right-[-10%] w-[50%] h-[60%] bg-[#F0D5E6] rounded-full filter blur-[140px] opacity-70"></div>
       <div class="absolute bottom-[-20%] left-[20%] w-[50%] h-[60%] bg-[#E0E7FF] rounded-full filter blur-[150px] opacity-80"></div>
     </div>
+    -->
 
-    <!-- 动态背景粒子画布，增加页面的流动感和科技感 -->
-    <canvas ref="canvasRef" class="absolute inset-x-0 top-0 w-full h-full pointer-events-none z-10 opacity-90"></canvas>
+    <!-- Legacy particle background retained for rollback reference only.
+    <canvas
+      ref="canvasRef"
+      class="absolute inset-x-0 top-0 w-full h-full pointer-events-none z-10 opacity-90"
+    ></canvas>
+    -->
 
     <!-- 玻璃拟态登录面板，包含品牌标识与交互表单 -->
-    <div class="relative z-20 flex w-[95%] md:w-[92%] max-w-[1320px] h-[88dvh] md:h-[800px] max-h-[940px] bg-white/40 backdrop-blur-[8px] rounded-[32px] border border-white/60 shadow-[0_20px_60px_-15px_rgba(0,0,0,0.15)] flex-col md:flex-row overflow-hidden">
+    <div
+      class="relative z-20 flex w-[95%] md:w-[92%] max-w-[1320px] h-[88dvh] md:h-[800px] max-h-[940px] rounded-[32px] flex-col md:flex-row overflow-hidden"
+      :class="loginPanelClass"
+    >
       
       <!-- 左侧装饰区域：包含动态表情交互与视觉美化 -->
-      <div class="w-full md:w-[45%] lg:w-[48%] bg-[#6B7584]/95 relative overflow-hidden hidden md:flex items-center justify-center shadow-inner">
+      <div
+        class="w-full md:w-[45%] lg:w-[48%] relative overflow-hidden hidden md:flex items-center justify-center shadow-inner"
+        :class="loginVisualPaneClass"
+      >
+        <!-- Legacy left-pane dark gradient retained for rollback reference only.
         <div class="absolute inset-0 bg-gradient-to-tr from-slate-900/60 to-transparent pointer-events-none z-0"></div>
+        -->
 
         <!-- 基础面部几何图形 -->
         <svg width="0" height="0" class="absolute">
@@ -147,23 +187,26 @@
       </div>
 
       <!-- 基础面部几何图形 -->
-      <div class="flex-1 w-full md:w-[52%] flex flex-col justify-center px-7 sm:px-12 lg:px-20 py-9 md:py-8 relative overflow-y-auto">
+      <div
+        class="flex-1 w-full md:w-[52%] flex flex-col justify-center px-7 sm:px-12 lg:px-20 py-9 md:py-8 relative overflow-y-auto"
+        :class="showMediaBackground ? 'auth-side-readable' : ''"
+      >
         
         <div class="mb-6 z-30">
-          <div class="flex items-center gap-4 mb-6">
-            <img src="@/assets/logo.png" alt="logo" class="h-10 w-auto object-contain" />
+          <div class="flex w-fit max-w-full items-center gap-4 mb-6 auth-brand-strip">
+            <img src="@/assets/logo.png" alt="logo" class="h-10 w-auto object-contain drop-shadow-[0_8px_18px_rgba(15,23,42,0.18)]" />
             <div class="flex flex-col">
-              <h1 class="text-[24px] font-bold text-[#1e293b] tracking-tight font-display flex items-baseline gap-2 leading-none">
-                NovaLeap <span class="text-[#f472b6]">知跃</span>
+              <h1 class="text-[24px] font-bold tracking-tight font-display flex items-baseline gap-2 leading-none auth-readable-heading">
+                NovaLeap <span :class="logoAccentClass">知跃</span>
               </h1>
             </div>
           </div>
 
-          <div class="flex p-1 bg-slate-200/50 backdrop-blur-md rounded-2xl w-full max-w-[460px] mx-auto lg:mx-0">
+          <div class="flex p-1 bg-slate-200/50 backdrop-blur-md rounded-2xl w-full max-w-[460px] mx-auto lg:mx-0 auth-readable-segment">
             <button
               type="button"
               class="flex-1 py-2.5 text-sm font-bold rounded-xl transition-all duration-300"
-              :class="activeTab === 'login' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'"
+              :class="activeTab === 'login' ? activeSegmentClass : inactiveSegmentClass"
               @click="router.push('/login')"
             >
               登录
@@ -171,7 +214,7 @@
             <button
               type="button"
               class="flex-1 py-2.5 text-sm font-bold rounded-xl transition-all duration-300"
-              :class="activeTab === 'register' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'"
+              :class="activeTab === 'register' ? activeSegmentClass : inactiveSegmentClass"
               @click="router.push('/register')"
             >
               注册
@@ -185,18 +228,18 @@
           </p>
 
           <div>
-            <label class="block text-[10px] font-bold tracking-widest text-[#475569] mb-1.5 uppercase opacity-80">
+            <label class="block text-[10px] font-bold tracking-widest text-[#475569] mb-1.5 uppercase opacity-80 auth-readable-label">
               账号 / {{ activeTab === 'login' ? '登录账号' : (activeTab === 'forgot' ? '重置目标邮箱' : '用于注册的邮箱') }}
             </label>
             <input type="text" v-model="form.username" required placeholder="请输入邮箱"
-                   class="w-full bg-white/70 border border-slate-200/80 rounded-[14px] px-5 py-[12px] text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-[4px] focus:ring-indigo-500/10 focus:border-indigo-500 transition-all duration-300 shadow-sm" />
+                   class="w-full bg-white/70 border border-slate-200/80 rounded-[14px] px-5 py-[12px] text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-[4px] focus:ring-indigo-500/10 focus:border-indigo-500 transition-all duration-300 shadow-sm auth-readable-input" />
           </div>
 
-          <div v-if="activeTab === 'login'" class="flex p-1 bg-slate-100/70 rounded-xl">
+          <div v-if="activeTab === 'login'" class="flex p-1 bg-slate-100/70 rounded-xl auth-readable-segment">
             <button
               type="button"
               class="flex-1 py-2 text-xs font-bold rounded-lg transition-all duration-300"
-              :class="!isCodeLoginMode ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'"
+              :class="!isCodeLoginMode ? activeSegmentClass : inactiveSegmentClass"
               @click="switchLoginMode('password')"
             >
               密码登录
@@ -204,7 +247,7 @@
             <button
               type="button"
               class="flex-1 py-2 text-xs font-bold rounded-lg transition-all duration-300"
-              :class="isCodeLoginMode ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'"
+              :class="isCodeLoginMode ? activeSegmentClass : inactiveSegmentClass"
               @click="switchLoginMode('code')"
             >
               验证码登录
@@ -212,15 +255,15 @@
           </div>
 
           <div v-if="showEmailCodeField">
-            <label class="block text-[10px] font-bold tracking-widest text-[#475569] mb-1.5 uppercase opacity-80">
+            <label class="block text-[10px] font-bold tracking-widest text-[#475569] mb-1.5 uppercase opacity-80 auth-readable-label">
               验证码 / 获取自邮箱
             </label>
             <div class="relative flex items-center">
               <input type="text" v-model="form.emailCode" required placeholder="输入 6 位验证码"
-                     class="w-full bg-white/70 border border-slate-200/80 rounded-[14px] px-5 py-[12px] text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-[4px] focus:ring-indigo-500/10 focus:border-indigo-500 transition-all duration-300 shadow-sm pr-[110px]" />
+                     class="w-full bg-white/70 border border-slate-200/80 rounded-[14px] px-5 py-[12px] text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-[4px] focus:ring-indigo-500/10 focus:border-indigo-500 transition-all duration-300 shadow-sm pr-[110px] auth-readable-input" />
               <button type="button" @click.prevent="handleSendCode" :disabled="sendCodeCooldown > 0 || isSendingCode"
                       class="absolute right-2 text-xs font-bold px-3 py-1.5 rounded-lg transition-all"
-                      :class="(sendCodeCooldown > 0 || isSendingCode) ? 'bg-slate-100 text-slate-400' : 'bg-indigo-100 text-indigo-600 hover:bg-indigo-200'">
+                      :class="(sendCodeCooldown > 0 || isSendingCode) ? sendCodeDisabledClass : sendCodeActiveClass">
                 <span v-if="isSendingCode" class="w-3 h-3 border border-slate-400 border-t-transparent rounded-full animate-spin inline-block align-middle mr-1"></span>
                 {{ isSendingCode ? '正在发送...' : (sendCodeCooldown > 0 ? `${sendCodeCooldown}s 后重新获取` : '获取验证码') }}
               </button>
@@ -229,19 +272,19 @@
 
           <div v-if="showPasswordField" class="relative">
             <div class="flex items-center justify-between mb-1.5">
-              <label class="block text-[10px] font-bold tracking-widest text-[#475569] uppercase opacity-80">
+              <label class="block text-[10px] font-bold tracking-widest text-[#475569] uppercase opacity-80 auth-readable-label">
                 密码 / {{ activeTab === 'login' ? '登录密码' : (activeTab === 'forgot' ? '你的新密码' : '设置你的密码') }}
               </label>
-              <button v-if="activeTab === 'login' && !isCodeLoginMode" type="button" @click="router.push('/forgot-password')" class="text-[10px] font-bold text-indigo-600 hover:text-indigo-500 transition-colors">忘记密码了？点此重置</button>
-              <button v-if="activeTab === 'forgot'" type="button" @click="router.push('/login')" class="text-[10px] font-bold text-slate-500 hover:text-slate-700 transition-colors">想起密码了？返回登录</button>
+              <button v-if="activeTab === 'login' && !isCodeLoginMode" type="button" @click="router.push('/forgot-password')" class="text-[11px] font-bold transition-colors auth-readable-link">忘记密码了？点此重置</button>
+              <button v-if="activeTab === 'forgot'" type="button" @click="router.push('/login')" class="text-[11px] font-bold transition-colors auth-readable-muted hover:text-slate-800">想起密码了？返回登录</button>
             </div>
             <div class="relative group/pwd">
               <input :type="showPassword ? 'text' : 'password'" v-model="form.password" :required="showPasswordField" placeholder="请输入您的密码"
                      @focus="isPasswordFocused = true" @blur="isPasswordFocused = false"
-                     class="w-full bg-white/70 border border-slate-200/80 rounded-[14px] px-5 pr-12 py-[12px] text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-[4px] focus:ring-purple-500/10 focus:border-purple-500 transition-all duration-300 shadow-sm tracking-[0.2em]"
+                     class="w-full bg-white/70 border border-slate-200/80 rounded-[14px] px-5 pr-12 py-[12px] text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-[4px] focus:ring-purple-500/10 focus:border-purple-500 transition-all duration-300 shadow-sm tracking-[0.2em] auth-readable-input"
                      :class="{'!border-rose-400 !text-rose-600 focus:!border-rose-400 focus:!ring-rose-500/20 !bg-rose-50/50': form.password && form.password.length < 6}" />
               <button type="button"
-                      class="absolute right-3 top-1/2 -translate-y-1/2 p-1.5 rounded-lg text-slate-400 hover:text-indigo-500 hover:bg-indigo-50/60 focus:outline-none transition-all duration-200"
+                      class="absolute right-3 top-1/2 -translate-y-1/2 p-1.5 rounded-lg text-slate-500 hover:text-indigo-700 hover:bg-white/70 focus:outline-none transition-all duration-200"
                       @mousedown.prevent
                       @click="showPassword = !showPassword"
                       aria-label="切换密码可见性">
@@ -265,14 +308,14 @@
           </div>
 
           <div v-if="activeTab !== 'login'" class="relative">
-            <label class="block text-[10px] font-bold tracking-widest text-[#475569] mb-1.5 uppercase opacity-80">再次确认 / 确认密码</label>
+            <label class="block text-[10px] font-bold tracking-widest text-[#475569] mb-1.5 uppercase opacity-80 auth-readable-label">再次确认 / 确认密码</label>
             <div class="relative group/cpwd">
               <input :type="showPassword ? 'text' : 'password'" v-model="form.confirmPassword" required placeholder="请再次输入防手滑输错"
                      @focus="isPasswordFocused = true" @blur="isPasswordFocused = false"
-                     class="w-full bg-white/70 border border-slate-200/80 rounded-[14px] px-5 pr-12 py-[12px] text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-[4px] focus:ring-purple-500/10 focus:border-purple-500 transition-all duration-300 shadow-sm tracking-[0.2em]"
+                     class="w-full bg-white/70 border border-slate-200/80 rounded-[14px] px-5 pr-12 py-[12px] text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-[4px] focus:ring-purple-500/10 focus:border-purple-500 transition-all duration-300 shadow-sm tracking-[0.2em] auth-readable-input"
                      :class="{'!border-rose-400 !text-rose-600 focus:!border-rose-400 focus:!ring-rose-500/20 !bg-rose-50/50': form.confirmPassword && form.password !== form.confirmPassword}" />
               <button type="button"
-                      class="absolute right-3 top-1/2 -translate-y-1/2 p-1.5 rounded-lg text-slate-400 hover:text-indigo-500 hover:bg-indigo-50/60 focus:outline-none transition-all duration-200"
+                      class="absolute right-3 top-1/2 -translate-y-1/2 p-1.5 rounded-lg text-slate-500 hover:text-indigo-700 hover:bg-white/70 focus:outline-none transition-all duration-200"
                       @mousedown.prevent
                       @click="showPassword = !showPassword"
                       aria-label="切换确认密码可见性">
@@ -294,17 +337,17 @@
           </div>
 
           <div v-if="activeTab === 'register'">
-            <label class="block text-[10px] font-bold tracking-widest text-[#475569] mb-1.5 uppercase opacity-80">昵称 / 给自己起个响亮的名字</label>
+            <label class="block text-[10px] font-bold tracking-widest text-[#475569] mb-1.5 uppercase opacity-80 auth-readable-label">昵称 / 给自己起个响亮的名字</label>
             <input type="text" v-model="form.nickname" placeholder="我们应该怎么称呼你呢？(可选)"
-                   class="w-full bg-white/70 border border-slate-200/80 rounded-[14px] px-5 py-[12px] text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-[4px] focus:ring-indigo-500/10 focus:border-indigo-500 transition-all duration-300 shadow-sm" />
+                   class="w-full bg-white/70 border border-slate-200/80 rounded-[14px] px-5 py-[12px] text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-[4px] focus:ring-indigo-500/10 focus:border-indigo-500 transition-all duration-300 shadow-sm auth-readable-input" />
           </div>
 
-          <label v-if="activeTab === 'register'" class="text-[11px] text-[#64748b] inline-flex items-start gap-2 mt-1">
+          <label v-if="activeTab === 'register'" class="text-[12px] inline-flex items-start gap-2 mt-1 auth-readable-muted">
             <input v-model="form.consent" type="checkbox" class="mt-0.5" />
             <span>我已认真阅读并同意
-              <router-link to="/terms" class="font-bold text-indigo-600">系统服务条款</router-link>
-              ?
-              <router-link to="/privacy" class="font-bold text-indigo-600">隐私保护政策</router-link>
+              <router-link to="/terms" class="font-bold auth-readable-link">《用户协议》</router-link>
+              和
+              <router-link to="/privacy" class="font-bold auth-readable-link">《隐私政策》</router-link>
             </span>
           </label>
 
@@ -321,7 +364,8 @@
             <button
               type="submit"
               :disabled="isSubmitDisabled"
-              class="w-full relative overflow-hidden bg-[#1e293b] text-white font-bold py-[12px] rounded-full hover:bg-black transition-all duration-300 shadow-lg hover:shadow-xl disabled:opacity-70 disabled:cursor-not-allowed pointer-events-auto">
+              class="w-full relative overflow-hidden text-white font-bold py-[12px] rounded-full transition-all duration-300 shadow-lg hover:shadow-xl disabled:opacity-70 disabled:cursor-not-allowed pointer-events-auto"
+              :class="primaryActionClass">
               <span class="relative z-10 flex items-center justify-center tracking-widest text-sm">
                 <span v-if="loading" class="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin mr-3"></span>
                 {{ loading ? '处理中...' : (activeTab === 'login' ? '登录' : (activeTab === 'forgot' ? '确认重置' : '开启旅程 / 注册')) }}
@@ -342,7 +386,8 @@
               type="button"
               @click="handleGuestLogin"
               :disabled="guestLoading"
-              class="w-full relative overflow-hidden bg-white/90 backdrop-blur-md border border-slate-200/60 text-[#1e293b] font-bold py-[12px] rounded-full hover:bg-slate-50 hover:shadow-md transition-all duration-300 shadow-sm mt-2 disabled:opacity-70 flex justify-center items-center group"
+              class="w-full relative overflow-hidden backdrop-blur-md font-bold py-[12px] rounded-full transition-all duration-300 shadow-sm mt-2 disabled:opacity-70 flex justify-center items-center group"
+              :class="guestActionClass"
             >
               <span
                 v-if="guestLoading"
@@ -373,6 +418,35 @@
 import { ref, reactive, onMounted, onBeforeUnmount, computed } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useAuth } from '@/composables/useAuth'
+
+// Active login background asset.
+const customBackgroundVideo = '/login-backgrounds/login-loop-premium.mp4'
+// Legacy background switching / asset mappings retained for rollback reference only.
+// const LOGIN_BACKGROUND_MODE = 'video-overlay'
+// const customBackgroundImage = '/login-backgrounds/login-spiderman.png'
+// const showVideoBackground = LOGIN_BACKGROUND_MODE === 'video-overlay'
+// const isSoftOverlayBackground = LOGIN_BACKGROUND_MODE === 'soft-overlay'
+// const showCustomBackground = LOGIN_BACKGROUND_MODE === 'soft-overlay' || LOGIN_BACKGROUND_MODE === 'image'
+// const showParticles = LOGIN_BACKGROUND_MODE === 'particles'
+// const loginBackgroundImageClass = isSoftOverlayBackground ? 'login-bg-image-soft' : 'login-bg-image-strong'
+// const loginBackgroundOverlayClass = showVideoBackground ? 'login-bg-overlay-video' : (isSoftOverlayBackground ? 'login-bg-overlay-soft' : 'login-bg-overlay-strong')
+// const loginBackgroundToneClass = showVideoBackground ? 'login-bg-tone-video' : (isSoftOverlayBackground ? 'login-bg-tone-soft' : 'login-bg-tone-strong')
+// Rollback video option: /login-backgrounds/login-loop-amber.mp4
+
+const showMediaBackground = true
+const showParticles = false
+const loginThemeClass = 'login-theme-video'
+const loginBackgroundClass = 'login-bg-video'
+const loginBackgroundVideoClass = 'login-bg-video-media'
+const loginPanelClass = 'login-panel-video'
+const loginVisualPaneClass = 'login-visual-pane-video'
+const activeSegmentClass = 'bg-[rgba(248,251,255,0.92)] text-[#30465d] shadow-[0_12px_24px_rgba(30,41,59,0.12)]'
+const inactiveSegmentClass = 'text-[#627487] hover:text-[#2f455a]'
+const sendCodeDisabledClass = 'bg-[rgba(226,232,240,0.82)] text-[#7b8794]'
+const sendCodeActiveClass = 'bg-[rgba(232,240,248,0.94)] text-[#3f5973] hover:bg-[rgba(220,232,243,0.98)]'
+const primaryActionClass = 'login-submit-video'
+const guestActionClass = 'login-guest-video'
+const logoAccentClass = 'text-[#f89aa5]'
 
 const router = useRouter()
 const route = useRoute()
@@ -478,6 +552,8 @@ const handleMouseMove = (e) => {
 // Canvas 背景粒子动画系统初始化
 const canvasRef = ref(null)
 let ctx = null
+let particleAnimationFrameId = null
+let canvasResizeHandler = null
 const particles = []
 const particleCount = 160 
 
@@ -548,28 +624,31 @@ class Particle {
 }
 
 const initCanvas = () => {
-  if (!canvasRef.value) return
+  if (!showParticles || !canvasRef.value) return
   ctx = canvasRef.value.getContext('2d') 
+  particles.length = 0
   const resize = () => {
     canvasRef.value.width = window.innerWidth
     canvasRef.value.height = window.innerHeight
   }
+  canvasResizeHandler = resize
   window.addEventListener('resize', resize)
   resize()
   for (let i = 0; i < particleCount; i++) particles.push(new Particle(canvasRef.value))
   const renderParticles = () => {
+    if (!canvasRef.value || !ctx) return
     ctx.clearRect(0, 0, canvasRef.value.width, canvasRef.value.height)
     for (let i = 0; i < particles.length; i++) {
         particles[i].update()
         particles[i].draw(ctx)
     }
-    requestAnimationFrame(renderParticles) 
+    particleAnimationFrameId = requestAnimationFrame(renderParticles)
   }
-  requestAnimationFrame(renderParticles)
+  particleAnimationFrameId = requestAnimationFrame(renderParticles)
 }
 
 onMounted(() => {
-  initCanvas()
+  if (showParticles) initCanvas()
   if (turnstileSiteKey) {
     window.novaTurnstileCallback = (token) => { turnstileToken.value = token || '' }
     
@@ -590,9 +669,12 @@ onMounted(() => {
 
 onBeforeUnmount(() => {
   window.removeEventListener('mousemove', handleMouseMove)
-  window.removeEventListener('resize', () => {})
+  if (canvasResizeHandler) window.removeEventListener('resize', canvasResizeHandler)
   if (animationFrameId) cancelAnimationFrame(animationFrameId)
+  if (particleAnimationFrameId) cancelAnimationFrame(particleAnimationFrameId)
   if (sendCodeTimer) clearInterval(sendCodeTimer)
+  ctx = null
+  particles.length = 0
 })
 
 const handleSubmit = async () => {
@@ -644,7 +726,7 @@ const handleLogin = async () => {
 const handleRegister = async () => {
   if (!canRegister.value) return
   if (!form.consent) {
-    error.value = '请先勾选同意服务条款和隐私政策'
+    error.value = '请先勾选同意《用户协议》和《隐私政策》'
     return
   }
   error.value = ''
@@ -798,6 +880,286 @@ input:-webkit-autofill:active{
   inset: 4px;
   border-radius: 14px;
   border: 1px solid rgba(255, 255, 255, 0.42);
+}
+
+.login-bg-soft {
+  background: #f5f2ee;
+}
+
+.login-bg-video {
+  background: #070b12;
+}
+
+.login-bg-video-media {
+  filter: none;
+  transform: none;
+}
+
+/*
+Legacy background overlays / image modes retained for rollback reference only.
+
+.login-bg-overlay-video {
+  background: rgba(8, 10, 16, 0.36);
+}
+
+.login-bg-tone-video {
+  background:
+    radial-gradient(circle at top left, rgba(216, 184, 132, 0.14), transparent 28%),
+    linear-gradient(135deg, rgba(9, 13, 22, 0.62), rgba(28, 34, 46, 0.16) 38%, rgba(7, 10, 18, 0.84));
+}
+
+.login-bg-image-soft {
+  filter: blur(2px) saturate(0.82);
+  transform: scale(1.03);
+}
+
+.login-bg-overlay-soft {
+  background: rgba(245, 242, 238, 0.6);
+  backdrop-filter: blur(20px);
+}
+
+.login-bg-tone-soft {
+  background:
+    radial-gradient(circle at top left, rgba(255, 255, 255, 0.55), transparent 32%),
+    linear-gradient(135deg, rgba(255, 248, 240, 0.42), rgba(245, 242, 238, 0.18) 42%, rgba(226, 217, 208, 0.32));
+}
+
+.login-bg-image-strong {
+  filter: saturate(0.96);
+}
+
+.login-bg-overlay-strong {
+  background: rgba(15, 23, 42, 0.42);
+}
+
+.login-bg-tone-strong {
+  background:
+    radial-gradient(circle at top left, rgba(255, 255, 255, 0.18), transparent 32%),
+    linear-gradient(135deg, rgba(15, 23, 42, 0.68), rgba(15, 23, 42, 0.24) 42%, rgba(2, 6, 23, 0.78));
+}
+
+.login-panel-soft {
+  background: rgba(255, 255, 255, 0.34);
+  border: 1px solid rgba(255, 255, 255, 0.46);
+  backdrop-filter: blur(18px);
+  box-shadow: 0 28px 80px -24px rgba(15, 23, 42, 0.24);
+}
+*/
+
+.login-panel-video {
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  backdrop-filter: blur(10px);
+  box-shadow: 0 28px 80px -24px rgba(2, 6, 23, 0.34);
+}
+
+/*
+Legacy panel / visual-pane variants retained for rollback reference only.
+
+.login-panel-strong {
+  background: rgba(255, 255, 255, 0.18);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  backdrop-filter: blur(12px);
+  box-shadow: 0 24px 70px -20px rgba(0, 0, 0, 0.45);
+}
+
+.login-panel-default {
+  background: rgba(255, 255, 255, 0.4);
+  border: 1px solid rgba(255, 255, 255, 0.6);
+  backdrop-filter: blur(8px);
+  box-shadow: 0 20px 60px -15px rgba(0, 0, 0, 0.15);
+}
+
+.login-visual-pane-soft {
+  background: rgba(15, 23, 42, 0.62);
+}
+*/
+
+.login-visual-pane-video {
+  background: rgba(4, 8, 18, 0.22);
+}
+
+/*
+Legacy visual-pane variants retained for rollback reference only.
+
+.login-visual-pane-strong {
+  background: rgba(2, 6, 23, 0.55);
+}
+
+.login-visual-pane-default {
+  background: rgba(107, 117, 132, 0.95);
+}
+*/
+
+.auth-side-readable {
+  background: linear-gradient(180deg, rgba(248, 250, 252, 0.76), rgba(255, 255, 255, 0.6));
+  border-left: 1px solid rgba(255, 255, 255, 0.24);
+}
+
+.auth-side-readable::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.14), rgba(255, 255, 255, 0.02)),
+    radial-gradient(circle at top right, rgba(255, 255, 255, 0.2), transparent 34%);
+}
+
+.auth-side-readable > * {
+  position: relative;
+  z-index: 1;
+}
+
+.auth-brand-strip {
+  padding: 0;
+  border-radius: 0;
+  background: transparent;
+  border: none;
+  box-shadow: none;
+  backdrop-filter: none;
+}
+
+.auth-readable-heading {
+  color: #0f172a;
+  text-shadow: 0 1px 20px rgba(255, 255, 255, 0.38);
+}
+
+.auth-readable-heading span {
+  color: #f89aa5 !important;
+}
+
+.auth-readable-segment {
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.45),
+    0 10px 26px rgba(15, 23, 42, 0.1);
+}
+
+.auth-side-readable label:not(.inline-flex),
+.auth-readable-label {
+  font-size: 11px;
+  letter-spacing: 0.16em;
+  color: #334155;
+  opacity: 1;
+  text-shadow: 0 1px 14px rgba(255, 255, 255, 0.28);
+}
+
+.auth-side-readable input:not([type='checkbox']),
+.auth-readable-input {
+  background: rgba(255, 255, 255, 0.88);
+  border-color: rgba(148, 163, 184, 0.38);
+  color: #0f172a;
+  box-shadow: 0 12px 30px rgba(15, 23, 42, 0.1);
+}
+
+.auth-side-readable input:not([type='checkbox'])::placeholder,
+.auth-readable-input::placeholder {
+  color: #64748b;
+  opacity: 0.95;
+}
+
+.auth-readable-link {
+  color: #4338ca;
+  text-shadow: 0 1px 12px rgba(255, 255, 255, 0.24);
+}
+
+.auth-readable-link:hover {
+  color: #312e81;
+}
+
+.auth-readable-muted {
+  color: #475569;
+  text-shadow: 0 1px 12px rgba(255, 255, 255, 0.24);
+}
+
+.login-submit-video {
+  background: linear-gradient(135deg, #0f172a, #1d2c3d 48%, #3f5b78);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  box-shadow: 0 20px 40px rgba(15, 23, 42, 0.24);
+}
+
+.login-submit-video:hover {
+  background: linear-gradient(135deg, #0c121b, #172333 48%, #344c65);
+}
+
+.login-guest-video {
+  background: rgba(245, 249, 253, 0.82);
+  border: 1px solid rgba(255, 255, 255, 0.56);
+  color: #203244;
+  box-shadow: 0 12px 28px rgba(15, 23, 42, 0.12);
+}
+
+.login-guest-video:hover {
+  background: rgba(250, 252, 255, 0.92);
+  box-shadow: 0 16px 32px rgba(15, 23, 42, 0.14);
+}
+
+.login-theme-video .auth-side-readable {
+  background: linear-gradient(180deg, rgba(246, 249, 252, 0.54), rgba(255, 255, 255, 0.34));
+}
+
+.login-theme-video .auth-side-readable::before {
+  background: none;
+}
+
+.login-theme-video .auth-brand-strip {
+  background: transparent;
+  border-color: transparent;
+  box-shadow: none;
+}
+
+.login-theme-video .auth-readable-heading {
+  color: #183042;
+}
+
+.login-theme-video .auth-readable-heading span {
+  color: rgba(0, 0, 0, 0.577) !important;
+}
+
+.login-theme-video .auth-readable-segment {
+  border-color: rgba(255, 255, 255, 0.44);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.54),
+    0 12px 28px rgba(15, 23, 42, 0.08);
+}
+
+.login-theme-video .auth-readable-label {
+  color: #546678;
+}
+
+.login-theme-video .auth-readable-input {
+  background: rgba(248, 251, 255, 0.8);
+  border-color: rgba(148, 163, 184, 0.24);
+}
+
+.login-theme-video .auth-readable-input::placeholder {
+  color: #7a8c9e;
+}
+
+.login-theme-video .auth-readable-input:focus {
+  border-color: #7d95af;
+  box-shadow:
+    0 0 0 4px rgba(125, 149, 175, 0.16),
+    0 16px 34px rgba(15, 23, 42, 0.12);
+}
+
+.login-theme-video .auth-readable-link {
+  color: #4b647d;
+}
+
+.login-theme-video .auth-readable-link:hover {
+  color: #324a61;
+}
+
+.login-theme-video .auth-readable-muted {
+  color: #657383;
+}
+
+.login-theme-video .group\/pwd > button:hover,
+.login-theme-video .group\/cpwd > button:hover {
+  color: #4b647d;
+  background: rgba(248, 251, 255, 0.72);
 }
 
 </style>

@@ -43,6 +43,8 @@ public interface AiService {
      */
     List<String> summarizeNote(String username, String title, String noteContent);
 
+    String generateDailyQuote(String username, String nickname);
+
     /**
      * AI + 关键词审核投稿手记
      */

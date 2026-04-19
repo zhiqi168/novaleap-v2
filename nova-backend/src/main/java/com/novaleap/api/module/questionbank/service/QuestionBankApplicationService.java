@@ -49,7 +49,7 @@ public class QuestionBankApplicationService {
     }
 
     public Page<CustomQuestionBankVO> getMyBanks(Authentication authentication, Integer page, Integer size, Integer status) {
-        User currentUser = currentUserService.requireDatabaseUser(authentication, "游客账号不能管理自定义题库");
+        User currentUser = currentUserService.requireDatabaseUser(authentication, "娓稿璐﹀彿涓嶈兘绠＄悊鑷畾涔夐搴?");
 
         Page<CustomQuestionBank> pageParam = new Page<>(page, size);
         LambdaQueryWrapper<CustomQuestionBank> wrapper = new LambdaQueryWrapper<>();
@@ -76,12 +76,12 @@ public class QuestionBankApplicationService {
             String category,
             Integer difficulty
     ) throws IOException {
-        User currentUser = currentUserService.requireDatabaseUser(authentication, "游客账号不能提交自定义题库");
-        validateImportFile(file);
+        User currentUser = currentUserService.requireDatabaseUser(authentication, "娓稿璐﹀彿涓嶈兘鎻愪氦鑷畾涔夐搴?");
+        questionBankImportService.validateImportFile(file, MAX_FILE_SIZE);
 
         QuestionBankImportService.ImportPayload payload = questionBankImportService.analyzeFile(file.getOriginalFilename(), file.getBytes());
         if (payload.questions().isEmpty()) {
-            throw new IllegalArgumentException("未解析到有效题目，请上传符合模板格式的 TXT 文件");
+            throw new IllegalArgumentException("鏈В鏋愬埌鏈夋晥棰樼洰锛岃涓婁紶绗﹀悎妯℃澘鏍煎紡鐨?TXT 鏂囦欢");
         }
 
         String normalizedCategory = questionBankSupport.normalizeCategory(category);
@@ -110,28 +110,19 @@ public class QuestionBankApplicationService {
     }
 
     public CustomQuestionBankVO renameQuestionBank(Long id, QuestionBankRenameRequest body, Authentication authentication) {
-        User currentUser = currentUserService.requireDatabaseUser(authentication, "游客账号不能重命名自定义题库");
+        User currentUser = currentUserService.requireDatabaseUser(authentication, "娓稿璐﹀彿涓嶈兘閲嶅懡鍚嶈嚜瀹氫箟棰樺簱");
 
         CustomQuestionBank bank = customQuestionBankMapper.selectById(id);
         if (bank == null) {
-            throw new NotFoundException("题库不存在");
+            throw new NotFoundException("棰樺簱涓嶅瓨鍦?");
         }
         if (!Objects.equals(currentUser.getId(), bank.getUserId()) && !questionAccessSupport.isAdmin(authentication)) {
-            throw new ForbiddenException("无权重命名该题库");
+            throw new ForbiddenException("鏃犳潈閲嶅懡鍚嶈棰樺簱");
         }
 
         bank.setName(questionBankSupport.limitLength(body.getName().trim(), 120));
         bank.setUpdatedAt(LocalDateTime.now());
         customQuestionBankMapper.updateById(bank);
         return QuestionBankViewAssembler.toUserVO(bank, questionBankSupport);
-    }
-
-    private void validateImportFile(MultipartFile file) {
-        if (file == null || file.isEmpty()) {
-            throw new IllegalArgumentException("请选择题库文件");
-        }
-        if (file.getSize() > MAX_FILE_SIZE) {
-            throw new IllegalArgumentException("文件大小不能超过 5MB");
-        }
     }
 }

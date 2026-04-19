@@ -32,6 +32,10 @@ public class AuthTokenStateSupport {
     }
 
     public boolean isTokenActive(String username, Date issuedAt) {
+        return isTokenActive(username, issuedAt, null);
+    }
+
+    public boolean isTokenActive(String username, Date issuedAt, Long issuedAtMillis) {
         if (!StringUtils.hasText(username) || issuedAt == null) {
             return true;
         }
@@ -40,7 +44,8 @@ public class AuthTokenStateSupport {
             return true;
         }
         try {
-            return issuedAt.getTime() >= Long.parseLong(value);
+            long tokenIssuedAtMillis = issuedAtMillis != null ? issuedAtMillis : issuedAt.getTime();
+            return tokenIssuedAtMillis >= Long.parseLong(value);
         } catch (Exception ignore) {
             return true;
         }

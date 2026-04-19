@@ -12,14 +12,14 @@ spring:
       database: ${SPRING_DATA_REDIS_DATABASE:0}
   ai:
     openai:
-      api-key: ${SPRING_AI_OPENAI_API_KEY:sk-disabled-placeholder}
+      api-key: ${SPRING_AI_OPENAI_API_KEY:}
       base-url: ${SPRING_AI_OPENAI_BASE_URL:https://api.longcat.chat/openai}
       chat:
         options:
           model: ${LONGCAT_MODEL:LongCat-Flash-Chat}
       usage:
         enabled: true
-        max-tokens: ${SPRING_AI_OPENAI_MAX_TOKENS:500000}
+        max-tokens: ${SPRING_AI_OPENAI_MAX_TOKENS:10000000}
         fallback-model: ${LONGCAT_MODEL_FALLBACK:LongCat-Flash-Lite}
   sql:
     init:

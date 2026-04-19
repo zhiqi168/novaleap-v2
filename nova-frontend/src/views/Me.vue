@@ -1,19 +1,12 @@
-﻿<template>
+<template>
   <div class="h-full relative overflow-hidden me-bg workspace-page workspace-scroll">
-    <canvas ref="confettiCanvas" class="absolute inset-0 w-full h-full pointer-events-none"></canvas>
+    <canvas ref="confettiCanvas" class="absolute inset-0 z-20 w-full h-full pointer-events-none"></canvas>
 
     <div class="relative z-10 h-full overflow-y-auto custom-scrollbar">
       <div class="workspace-stack max-w-[1120px] mx-auto text-center">
-        <header class="workspace-titlebar me-titlebar text-left">
-          <div class="workspace-titlecopy">
-            <h1 class="workspace-title">我的空间</h1>
-            <p class="workspace-subtitle">聚合身份信息、状态反馈与个人激励，保持所有模块中的体验一致。</p>
-          </div>
-        </header>
-
-        <section class="workspace-section">
+        <section class="pt-1">
         <h1 class="text-[clamp(40px,6vw,66px)] font-black leading-tight text-text-primary break-words">
-          {{ greetingPrefix }}锛?
+          {{ greetingPrefix }}，
           <span class="me-name-highlight text-transparent bg-clip-text">
             {{ displayNickname }}
           </span>
@@ -21,15 +14,15 @@
         <p class="mt-3 text-[clamp(28px,4.4vw,52px)] text-text-secondary leading-tight">{{ subLine }}</p>
 
         <div class="mt-8 flex flex-col items-center relative">
-          <button class="avatar-orbit" type="button" @click="goProfile" title="鍓嶅線涓汉璧勬枡">
+          <button class="avatar-orbit" type="button" @click="goProfile" title="前往个人资料">
             <div class="avatar-core">
               <span v-if="isEmoji(displayAvatar)">{{ displayAvatar }}</span>
               <img v-else :src="displayAvatar" alt="avatar" />
             </div>
           </button>
 
-          <button class="workspace-btn workspace-btn-primary boost-btn mt-6" @click="cheerUp">鈾?缁欐垜鎵撴皵</button>
-          <button class="workspace-btn workspace-btn-muted profile-btn mt-3" @click="goProfile">涓汉璧勬枡</button>
+          <button class="workspace-btn workspace-btn-primary boost-btn mt-6" @click="cheerUp">❤ 给我打气</button>
+          <button class="workspace-btn workspace-btn-muted profile-btn mt-3" @click="goProfile">个人资料</button>
 
           <div class="cheer-popup-layer" aria-live="polite">
             <div
@@ -44,7 +37,7 @@
         </div>
 
         <div class="workspace-shell mt-10 bg-bg-surface backdrop-blur-xl rounded-3xl shadow-card border border-border-subtle p-7 md:p-8 text-left">
-          <div class="text-xl font-bold text-text-primary">浠婃棩鏍艰█</div>
+          <div class="text-xl font-bold text-text-primary">今日格言</div>
           <div class="mt-5 text-[clamp(30px,4.2vw,52px)] font-medium text-text-primary tracking-tight leading-tight">{{ quote }}</div>
         </div>
         </section>
@@ -54,9 +47,10 @@
 </template>
 
 <script setup>
-import { computed, onMounted, onUnmounted, ref } from 'vue'
+import { computed, nextTick, onActivated, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
+import { api } from '@/composables/useRequest'
 
 const authStore = useAuthStore()
 const router = useRouter()
@@ -74,47 +68,91 @@ const greetingPrefix = computed(() => {
 
 const subLine = '今天也是充满可能的一天'
 
-const quotePool = [
-  '你写下的每一行代码，都在改变未来。',
-  '坚持的背后，藏着最美的风景。',
-  '今天的一点进步，就是明天的一大步。',
-  '把复杂问题拆小，你已经赢了一半。',
-  '稳定输出，比偶尔爆发更强大。',
-  '保持专注，时间会给你复利。',
-]
+const DAILY_QUOTE_STORAGE_KEY = 'nova_me_daily_quote_v1'
+const DAILY_QUOTE_FALLBACK = '把复杂问题拆小，你已经赢了一半。'
 
-const createNonRepeatPicker = (pool) => {
-  let queue = []
-  let last = ''
+const quote = ref(DAILY_QUOTE_FALLBACK)
+let dailyQuoteTimer = 0
+let latestQuoteRequestId = 0
 
-  const shuffle = (arr) => {
-    for (let i = arr.length - 1; i > 0; i -= 1) {
-      const j = Math.floor(Math.random() * (i + 1))
-      ;[arr[i], arr[j]] = [arr[j], arr[i]]
-    }
-    return arr
-  }
+const todayKey = () => {
+  const now = new Date()
+  const year = now.getFullYear()
+  const month = String(now.getMonth() + 1).padStart(2, '0')
+  const day = String(now.getDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
+}
 
-  return () => {
-    if (queue.length === 0) {
-      queue = shuffle([...pool])
-      if (queue.length > 1 && queue[0] === last) {
-        ;[queue[0], queue[1]] = [queue[1], queue[0]]
-      }
-    }
-    const next = queue.shift() || pool[0] || ''
-    last = next
-    return next
+const readDailyQuoteCache = () => {
+  try {
+    const raw = localStorage.getItem(DAILY_QUOTE_STORAGE_KEY)
+    if (!raw) return null
+    const parsed = JSON.parse(raw)
+    if (!parsed || typeof parsed !== 'object') return null
+    return parsed
+  } catch {
+    return null
   }
 }
 
-const pickQuote = createNonRepeatPicker(quotePool)
+const writeDailyQuoteCache = (date, text) => {
+  try {
+    localStorage.setItem(DAILY_QUOTE_STORAGE_KEY, JSON.stringify({ date, text }))
+  } catch {
+    // ignore cache failures
+  }
+}
 
-const quote = ref(pickQuote())
-let copyTimer = 0
+const applyCachedDailyQuote = () => {
+  const cached = readDailyQuoteCache()
+  if (cached?.date === todayKey() && typeof cached.text === 'string' && cached.text.trim()) {
+    quote.value = cached.text.trim()
+    return true
+  }
+  return false
+}
 
-const rotateCopy = () => {
-  quote.value = pickQuote()
+const fetchDailyQuote = async ({ force = false } = {}) => {
+  const date = todayKey()
+  if (!force && applyCachedDailyQuote()) {
+    return
+  }
+
+  const requestId = ++latestQuoteRequestId
+
+  try {
+    const res = await api.get('/api/ai/quote/daily')
+    const nextQuote = typeof res?.data === 'string' && res.data.trim() ? res.data.trim() : DAILY_QUOTE_FALLBACK
+    if (requestId !== latestQuoteRequestId) return
+    quote.value = nextQuote
+    writeDailyQuoteCache(date, nextQuote)
+  } catch {
+    if (requestId !== latestQuoteRequestId) return
+    const cached = readDailyQuoteCache()
+    if (cached?.date === date && typeof cached.text === 'string' && cached.text.trim()) {
+      quote.value = cached.text.trim()
+      return
+    }
+    quote.value = DAILY_QUOTE_FALLBACK
+    writeDailyQuoteCache(date, DAILY_QUOTE_FALLBACK)
+  }
+}
+
+const scheduleDailyQuoteRefresh = () => {
+  if (dailyQuoteTimer) {
+    clearTimeout(dailyQuoteTimer)
+    dailyQuoteTimer = 0
+  }
+
+  const now = new Date()
+  const nextMidnight = new Date(now)
+  nextMidnight.setHours(24, 0, 0, 0)
+  const delay = Math.max(1000, nextMidnight.getTime() - now.getTime() + 1000)
+
+  dailyQuoteTimer = window.setTimeout(async () => {
+    await fetchDailyQuote({ force: true })
+    scheduleDailyQuoteRefresh()
+  }, delay)
 }
 
 const guestIdPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
@@ -122,12 +160,12 @@ const isGuest = computed(() => {
   if (authStore.isGuest) return true
   const nickname = String(authStore.nickname || '')
   const username = String(authStore.user?.username || authStore.username || '')
-  return nickname.startsWith('娓稿') || guestIdPattern.test(username)
+  return nickname.startsWith('游客') || guestIdPattern.test(username)
 })
 
 const displayAvatar = computed(() => {
   const avatar = String(authStore.avatar || '').trim()
-  if (!avatar) return '馃コ'
+  if (!avatar) return '🥳'
   if (/^https?:\/\//i.test(avatar)) return avatar
   return avatar
 })
@@ -197,6 +235,7 @@ const spawn = (side, strength = 1) => {
 }
 
 const triggerSideCannons = (strength = 1) => {
+  fitCanvas()
   spawn('left', strength)
   spawn('right', strength)
 }
@@ -334,45 +373,69 @@ const fitCanvas = () => {
 }
 
 const cheerUp = () => {
-  rotateCopy()
   pushCheerPopup()
   restartCheerSequence()
 }
 
-const goProfile = () => {
-  router.push('/profile')
-}
-
-onMounted(() => {
-  ctx = confettiCanvas.value?.getContext('2d')
-  if (!ctx) return
-
-  fitCanvas()
+const triggerStartupBurst = () => {
   for (let i = 0; i < ENTRY_CHAIN_BURSTS; i += 1) {
     const timer = window.setTimeout(() => {
       triggerSideCannons(ENTRY_STRENGTH)
     }, i * ENTRY_CHAIN_GAP_MS)
     startupBurstTimers.push(timer)
   }
+}
+
+const goProfile = () => {
+  router.push('/profile')
+}
+
+onMounted(async () => {
+  applyCachedDailyQuote()
+  fetchDailyQuote()
+  scheduleDailyQuoteRefresh()
+
+  ctx = confettiCanvas.value?.getContext('2d')
+  if (!ctx) return
 
   rafId = requestAnimationFrame(loop)
   window.addEventListener('resize', fitCanvas)
-
-  copyTimer = window.setInterval(() => {
-    rotateCopy()
-  }, 8000)
 
   hourTimer = window.setInterval(() => {
     currentHour.value = new Date().getHours()
   }, 60000)
 })
 
+onActivated(async () => {
+  if (!applyCachedDailyQuote()) {
+    fetchDailyQuote({ force: true })
+  }
+  scheduleDailyQuoteRefresh()
+
+  if (!ctx) {
+    ctx = confettiCanvas.value?.getContext('2d')
+  }
+  if (!ctx) return
+
+  await nextTick()
+  setTimeout(() => {
+    fitCanvas()
+    triggerStartupBurst()
+  }, 100)
+})
+
 onUnmounted(() => {
   cancelAnimationFrame(rafId)
   window.removeEventListener('resize', fitCanvas)
   clearCheerResources()
-  if (copyTimer) clearInterval(copyTimer)
+  if (dailyQuoteTimer) clearTimeout(dailyQuoteTimer)
   if (hourTimer) clearInterval(hourTimer)
+})
+
+watch(displayNickname, () => {
+  if (!applyCachedDailyQuote()) {
+    fetchDailyQuote({ force: true })
+  }
 })
 </script>
 
@@ -555,4 +618,3 @@ onUnmounted(() => {
   }
 }
 </style>
-

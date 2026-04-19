@@ -132,9 +132,9 @@ defineEmits(['toggle-dark-mode', 'go-profile', 'logout', 'toggle-sidebar'])
 .sidebar-shell {
   position: relative;
   z-index: 10;
-  background: rgba(255, 255, 255, 0.9);
+  background: var(--bg-surface);
   backdrop-filter: blur(20px);
-  box-shadow: 24px 0 40px rgba(31, 41, 55, 0.04);
+  box-shadow: 24px 0 40px rgba(31, 41, 55, 0.03);
   transition: width 0.28s ease;
 }
 
@@ -146,7 +146,7 @@ defineEmits(['toggle-dark-mode', 'go-profile', 'logout', 'toggle-sidebar'])
   gap: 12px;
   border-radius: 22px;
   border: 1px solid var(--border-soft);
-  background: rgba(255, 255, 255, 0.88);
+  background: var(--bg-elevated);
   padding: 12px;
 }
 
@@ -156,7 +156,7 @@ defineEmits(['toggle-dark-mode', 'go-profile', 'logout', 'toggle-sidebar'])
   display: grid;
   place-items: center;
   border-radius: 18px;
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(246, 247, 251, 0.98));
+  background: var(--bg-card);
 }
 
 .nav-item {
@@ -227,8 +227,8 @@ defineEmits(['toggle-dark-mode', 'go-profile', 'logout', 'toggle-sidebar'])
   display: grid;
   place-items: center;
   border-radius: 16px;
-  border: 1px solid rgba(232, 236, 244, 0.96);
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(246, 247, 251, 0.98));
+  border: 1px solid var(--border-soft);
+  background: var(--bg-card);
 }
 
 .logout-button {

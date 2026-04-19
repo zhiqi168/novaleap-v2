@@ -32,7 +32,7 @@
           @click="handleLogout"
           class="w-full flex items-center px-4 py-2 text-sm text-gray-300 hover:text-white hover:bg-white/10 rounded-md transition-colors"
         >
-          <LogOut class="w-4 h-4 mr-2" /> 退出登录
+          <LogOut class="w-4 h-4 mr-2" /> 退出登�?
         </button>
       </div>
     </aside>
@@ -59,6 +59,7 @@
 
 <script setup>
 import { computed } from 'vue'
+import { clearAdminToken } from '@/composables/adminAuthStorage'
 import { useRoute, useRouter } from 'vue-router'
 import {
   LayoutDashboard,
@@ -77,7 +78,7 @@ const currentRouteName = computed(() => route.name || 'Nova Admin')
 
 const handleLogout = () => {
   if (confirm('确定要退出管理端吗？')) {
-    localStorage.removeItem('nova_admin_token')
+    clearAdminToken()
     router.push('/login')
   }
 }
@@ -106,3 +107,4 @@ const handleLogout = () => {
   opacity: 0;
 }
 </style>
+

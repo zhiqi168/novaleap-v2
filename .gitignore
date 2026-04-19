@@ -1,6 +1,7 @@
-# Node / 前端
+# Node / Frontend
 node_modules/
 .npm-cache/
+.vite/
 dist/
 .cache/
 .pnpm-store/
@@ -12,7 +13,7 @@ target/
 *.war
 *.iml
 
-# IDE
+# IDE / Editor
 .idea/
 .vscode/
 *.ipr
@@ -20,33 +21,35 @@ target/
 
 # Environment
 .env
-.env.*
+.env.local
+.env.*.local
 application-local.yml
 application-dev.yml
 
-# Logs
+# Logs / Crash dumps
 *.log
 hs_err_pid*
 replay_pid*
 
 # Temp files
-.tmp*
-tmp_*
-*.tmp
-*.pid
-*.pid.txt
-
-# OS
-.DS_Store
-Thumbs.db
-
-# Redis / Docker data
-redis-data/
-
-# temp
+.tmp/
 .tmp*
 tmp_*
 *.tmp
 *.pid
 *.pid.txt
 *.jsh
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Runtime data
+mysql-data/
+redis-data/
+
+# Local tool state
+.codex-review/
+
+# Test artifacts
+nova-backend/test-reports/

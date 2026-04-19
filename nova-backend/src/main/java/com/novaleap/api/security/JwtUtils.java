@@ -1,5 +1,6 @@
 package com.novaleap.api.security;
 
+import com.novaleap.api.module.auth.support.AuthPortal;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.security.Keys;
@@ -23,10 +24,17 @@ public class JwtUtils {
     }
 
     public String generateToken(String username, String role) {
+        return generateToken(username, role, AuthPortal.CLIENT);
+    }
+
+    public String generateToken(String username, String role, AuthPortal portal) {
+        long issuedAtMillis = System.currentTimeMillis();
         return Jwts.builder()
                 .subject(username)
                 .claim("role", role)
-                .issuedAt(new Date())
+                .claim("portal", portal.claimValue())
+                .claim("iat_ms", issuedAtMillis)
+                .issuedAt(new Date(issuedAtMillis))
                 .expiration(new Date(System.currentTimeMillis() + expiration))
                 .signWith(getSigningKey())
                 .compact();
@@ -38,6 +46,10 @@ public class JwtUtils {
 
     public String getRoleFromToken(String token) {
         return parseClaims(token).get("role", String.class);
+    }
+
+    public String getPortalFromToken(String token) {
+        return parseClaims(token).get("portal", String.class);
     }
 
     public Date getIssuedAtFromToken(String token) {

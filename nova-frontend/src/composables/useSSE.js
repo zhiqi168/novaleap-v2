@@ -1,4 +1,5 @@
 import { ref } from 'vue'
+import { withApiBase } from '@/config/api'
 
 export function useSSE() {
   const content = ref('')
@@ -90,10 +91,10 @@ export function useSSE() {
 
     abortController = new AbortController()
     const signal = abortController.signal
-    const token = localStorage.getItem('nova_token')
+    const token = sessionStorage.getItem('nova_token') || localStorage.getItem('nova_token')
 
     try {
-      const response = await fetch(url, {
+      const response = await fetch(withApiBase(url), {
         method: options.method || 'GET',
         headers: {
           'Content-Type': 'application/json',

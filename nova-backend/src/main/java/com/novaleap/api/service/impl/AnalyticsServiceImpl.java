@@ -4,11 +4,13 @@ import com.novaleap.api.module.analytics.support.AnalyticsGeoInfo;
 import com.novaleap.api.module.analytics.support.AnalyticsGeoService;
 import com.novaleap.api.module.analytics.support.AnalyticsVisitStore;
 import com.novaleap.api.service.AnalyticsService;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.ZSetOperations;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 
+import java.time.Duration;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
@@ -19,6 +21,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 
+@Slf4j
 @Service
 public class AnalyticsServiceImpl implements AnalyticsService {
 
@@ -26,6 +29,7 @@ public class AnalyticsServiceImpl implements AnalyticsService {
     private static final String ACTOR_GUEST = "guest";
     private static final String ACTOR_USER = "user";
     private static final DateTimeFormatter DAY_FMT = DateTimeFormatter.BASIC_ISO_DATE;
+    private static final Duration DAILY_METRIC_TTL = Duration.ofDays(90);
 
     private final StringRedisTemplate redisTemplate;
     private final AnalyticsGeoService analyticsGeoService;
@@ -49,19 +53,24 @@ public class AnalyticsServiceImpl implements AnalyticsService {
 
             redisTemplate.opsForValue().increment(pvKey(actor, "total"), 1);
             redisTemplate.opsForValue().increment(pvKey(actor, day), 1);
+            redisTemplate.expire(pvKey(actor, day), DAILY_METRIC_TTL);
 
             String uvIdentity = StringUtils.hasText(uniqueIdentity) ? uniqueIdentity : "visitor:" + visitorId;
             redisTemplate.opsForHyperLogLog().add(uvKey(actor, "total"), uvIdentity);
             redisTemplate.opsForHyperLogLog().add(uvKey(actor, day), uvIdentity);
+            redisTemplate.expire(uvKey(actor, day), DAILY_METRIC_TTL);
 
             if (StringUtils.hasText(path)) {
-                redisTemplate.opsForValue().increment(KEY_PREFIX + "path:pv:" + day + ":" + path, 1);
+                String pathPvKey = KEY_PREFIX + "path:pv:" + day + ":" + path;
+                redisTemplate.opsForValue().increment(pathPvKey, 1);
+                redisTemplate.expire(pathPvKey, DAILY_METRIC_TTL);
             }
 
             AnalyticsGeoInfo geo = analyticsGeoService.resolveGeoInfo(ipAddress);
             analyticsVisitStore.recordGeo(day, actor, ipAddress, path, geo);
             analyticsVisitStore.recordVisitor(actor, uvIdentity, visitorId, path, ipAddress, geo, actorName);
-        } catch (Exception ignore) {
+        } catch (Exception e) {
+            log.warn("track visit failed: actorType={}, visitorId={}, path={}", actorType, visitorId, path, e);
         }
     }
 

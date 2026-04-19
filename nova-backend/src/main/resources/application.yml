@@ -14,7 +14,6 @@ spring:
     active: ${SPRING_PROFILES_ACTIVE:dev}
 
 mybatis-plus:
-  mapper-locations: classpath:mapper/*.xml
   global-config:
     db-config:
       id-type: auto
@@ -26,6 +25,8 @@ mybatis-plus:
 
 nova:
   startup:
+    community-seed:
+      enabled: ${NOVA_STARTUP_COMMUNITY_SEED_ENABLED:true}
     username-guard:
       enabled: ${NOVA_STARTUP_USERNAME_GUARD_ENABLED:false}
   jwt:
@@ -35,11 +36,28 @@ nova:
     secret: ${NOVA_TURNSTILE_SECRET:}
   mail:
     resend:
-      api-key: ${NOVA_RESEND_API_KEY:re_G9zFtpzu_9xAatvWRCtZDnbz13z8S7hLH}
+      api-key: ${NOVA_RESEND_API_KEY:re_dwMoZ46Y_3qMNpkzVFcrmC1QDXk33LupG}
       from: ${NOVA_RESEND_FROM:NovaLeap <zhiqi@novaleap.xyz>}
   ai:
+    quota:
+      daily-token-limit: ${NOVA_AI_QUOTA_DAILY_TOKEN_LIMIT:10000000}
+      warning-ratio: ${NOVA_AI_QUOTA_WARNING_RATIO:0.70}
+      protect-ratio: ${NOVA_AI_QUOTA_PROTECT_RATIO:0.85}
+      limit-ratio: ${NOVA_AI_QUOTA_LIMIT_RATIO:0.95}
+      per-model-token-limit: ${NOVA_AI_QUOTA_PER_MODEL_TOKEN_LIMIT:5000000}
+      model-usage-ttl-days: ${NOVA_AI_QUOTA_MODEL_USAGE_TTL_DAYS:2}
+    gateway:
+      request-timeout-ms: ${NOVA_AI_GATEWAY_TIMEOUT_MS:15000}
+      max-retry-attempts: ${NOVA_AI_GATEWAY_MAX_RETRY_ATTEMPTS:2}
+      retry-backoff-ms: ${NOVA_AI_GATEWAY_RETRY_BACKOFF_MS:350}
+      circuit-window-seconds: ${NOVA_AI_GATEWAY_CIRCUIT_WINDOW_SECONDS:120}
+      circuit-failure-threshold: ${NOVA_AI_GATEWAY_CIRCUIT_FAILURE_THRESHOLD:5}
+      circuit-open-seconds: ${NOVA_AI_GATEWAY_CIRCUIT_OPEN_SECONDS:90}
+      min-response-tokens: ${NOVA_AI_GATEWAY_MIN_RESPONSE_TOKENS:128}
     web:
       enabled: ${NOVA_AI_WEB_ENABLED:true}
       weather-enabled: ${NOVA_AI_WEB_WEATHER_ENABLED:true}
       search-enabled: ${NOVA_AI_WEB_SEARCH_ENABLED:true}
       request-timeout-ms: ${NOVA_AI_WEB_TIMEOUT_MS:1200}
+  security:
+    allowed-origins: ${NOVA_ALLOWED_ORIGINS:*}

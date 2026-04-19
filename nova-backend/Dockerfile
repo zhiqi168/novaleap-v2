@@ -4,10 +4,9 @@ WORKDIR /build
 
 COPY pom.xml .
 COPY src ./src
-COPY init.sql .
 
 # 忽略测试跳过加快打包速度
-RUN mvn clean package -DskipTests
+RUN mvn clean package -Dmaven.test.skip=true
 
 # 第二阶段：最小化 JRE 运行环境
 FROM eclipse-temurin:17-jre-alpine
