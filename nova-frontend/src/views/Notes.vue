@@ -1,8 +1,36 @@
 
 <template>
   <div class="h-full relative overflow-hidden notes-shell workspace-page workspace-shell sm:mx-4">
-    <div class="relative z-10 h-full flex flex-col lg:flex-row">
-      <aside class="w-full lg:w-[430px] xl:w-[460px] border-b lg:border-b-0 lg:border-r border-border-subtle bg-bg-surface backdrop-blur-xl flex flex-col h-[48%] lg:h-full shrink-0">
+    <div
+      class="relative z-10 h-full flex flex-col lg:flex-row"
+      @touchstart.passive="handleTouchStart"
+      @touchmove.passive="handleTouchMove"
+      @touchend="handleTouchEnd"
+      @touchcancel="resetTouchState"
+    >
+      <div class="lg:hidden shrink-0 px-3 pt-3 pb-2 border-b border-border-subtle bg-bg-surface/80 backdrop-blur">
+        <div class="grid grid-cols-2 gap-2 rounded-xl bg-black/[0.03] p-1">
+          <button
+            class="rounded-lg px-3 py-2 text-sm font-semibold transition-colors"
+            :class="mobileNoteTab === 'list' ? 'bg-bg-elevated text-text-primary shadow-sm' : 'text-text-tertiary'"
+            @click="setMobileNoteTab('list')"
+          >
+            手记列表
+          </button>
+          <button
+            class="rounded-lg px-3 py-2 text-sm font-semibold transition-colors"
+            :class="mobileNoteTab === 'detail' ? 'bg-bg-elevated text-text-primary shadow-sm' : 'text-text-tertiary'"
+            @click="setMobileNoteTab('detail')"
+          >
+            手记详情
+          </button>
+        </div>
+      </div>
+
+      <aside
+        class="w-full lg:w-[430px] xl:w-[460px] border-b lg:border-b-0 lg:border-r border-border-subtle bg-bg-surface backdrop-blur-xl flex-col shrink-0"
+        :class="mobileNoteTab === 'detail' ? 'hidden lg:flex lg:h-full' : 'flex h-full lg:h-full'"
+      >
         <div class="px-4 pt-4 pb-3 border-b border-border-subtle">
           <div class="flex items-center justify-between gap-2">
             <div>
@@ -63,9 +91,8 @@
             </button>
           </div>
 
-          <div class="mt-3 flex items-center justify-between text-xs text-slate-500">
+          <div class="mt-3 flex items-center text-xs text-slate-500">
             <span>{{ notesCountText }}</span>
-            <span v-if="activeNote">当前阅读 #{{ activeNote.id }}</span>
           </div>
         </div>
 
@@ -130,10 +157,22 @@
         </div>
       </aside>
 
-      <section class="flex-1 overflow-y-auto custom-scrollbar">
+      <section
+        class="flex-1 overflow-y-auto custom-scrollbar min-h-0"
+        :class="mobileNoteTab === 'list' ? 'hidden lg:block' : 'block'"
+      >
         <template v-if="activeNote">
           <div class="max-w-[1020px] mx-auto px-5 md:px-8 xl:px-10 py-7 space-y-5">
             <header class="rounded-3xl border border-border-subtle bg-bg-surface backdrop-blur-xl p-5 md:p-7 shadow-card">
+              <button
+                class="lg:hidden inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold border border-border-subtle bg-bg-elevated text-text-secondary hover:bg-bg-soft transition-colors"
+                @click="setMobileNoteTab('list')"
+              >
+                <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 18l-6-6 6-6" />
+                </svg>
+                返回列表
+              </button>
               <div class="text-xs text-text-secondary tracking-wide">手记 / {{ activeNote.category }}</div>
               <h1 class="mt-2 text-2xl md:text-3xl leading-tight font-bold text-text-primary">{{ activeNote.title }}</h1>
               <div class="mt-4 flex flex-wrap items-center gap-2 text-xs">
@@ -231,54 +270,159 @@
       </section>
     </div>
 
-    <div v-if="showSubmitDialog" class="fixed inset-0 z-40 bg-black/30 backdrop-blur-sm flex items-center justify-center p-4" @click.self="closeSubmitDialog">
-      <div class="w-full max-w-2xl bg-bg-card rounded-2xl border border-border-soft shadow-2xl">
-        <div class="px-5 py-4 border-b border-black/8 flex items-center justify-between">
-          <h3 class="text-base font-semibold text-slate-800">{{ isEditingNote ? '编辑手记（保存后自动复审）' : '投稿手记（AI 自动审核）' }}</h3>
-          <button class="p-1.5 rounded hover:bg-black/5 text-slate-500" @click="closeSubmitDialog">
-            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
-          </button>
-        </div>
-
-        <div class="px-5 py-4 space-y-3">
-          <input v-model="submitForm.title" type="text" class="workspace-control w-full px-3 py-2 rounded-lg border border-border-soft bg-bg-surface text-sm outline-none focus:ring-2 focus:ring-ai-from/25" placeholder="请输入手记标题" />
-          <div class="grid grid-cols-1 sm:grid-cols-3 gap-2">
-            <input v-model="submitForm.category" type="text" class="w-full px-3 py-2 rounded-lg border border-border-soft bg-bg-surface text-sm outline-none focus:ring-2 focus:ring-ai-from/25" placeholder="分类（如 后端）" />
-            <div class="rounded-lg border border-border-soft bg-bg-surface px-2 py-1.5">
-              <div class="text-[11px] text-slate-500">封面图标</div>
-              <div class="mt-1 flex items-center gap-1.5 flex-wrap">
-                <button
-                  v-for="emoji in noteEmojiOptions"
-                  :key="emoji"
-                  type="button"
-                  class="w-8 h-8 rounded-md border text-base leading-none transition-colors"
-                  :class="submitForm.emoji === emoji ? 'border-ai-from bg-ai-from/10' : 'border-black/10 hover:bg-black/[0.03]'"
-                  @click="submitForm.emoji = emoji"
-                >
-                  {{ emoji }}
-                </button>
+    <transition name="submit-note-fade">
+      <div v-if="showSubmitDialog" class="submit-note-overlay" @click.self="closeSubmitDialog">
+        <div class="submit-note-shell">
+          <div class="submit-note-dialog">
+          <div class="submit-note-header">
+            <div class="min-w-0">
+              <div class="flex flex-wrap items-center gap-2">
+                <h3 class="submit-note-title">投稿手记</h3>
+                <span class="submit-note-badge">发布审核</span>
               </div>
+              <p class="submit-note-subtitle">
+                {{ isEditingNote ? '保存后会重新进行内容校验与发布审核，展示内容会同步更新。' : '提交后会先进行内容校验与发布审核，通过后即可公开展示。' }}
+              </p>
             </div>
-            <input v-model="submitForm.summary" type="text" class="w-full px-3 py-2 rounded-lg border border-border-soft bg-bg-surface text-sm outline-none focus:ring-2 focus:ring-ai-from/25" placeholder="摘要（可选）" />
+            <button class="submit-note-close" @click="closeSubmitDialog">
+              <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
+            </button>
           </div>
-          <textarea v-model="submitForm.content" rows="10" class="workspace-control w-full px-3 py-2 rounded-lg border border-border-soft bg-bg-surface text-sm outline-none resize-y focus:ring-2 focus:ring-ai-from/25" placeholder="正文内容（支持 Markdown）"></textarea>
-          <p class="text-xs text-slate-500">{{ isEditingNote ? '保存后会重新进行违禁词审核：通过则立即展示，不通过会返回具体失败原因。' : '提交后会先进行违禁词审核：通过则立即展示，不通过会返回具体失败原因。' }}</p>
-        </div>
 
-        <div class="px-5 py-4 border-t border-black/8 flex justify-end gap-2">
-          <button class="workspace-btn workspace-btn-muted px-3 py-2 rounded-lg border border-black/10 text-sm hover:bg-black/[0.03]" @click="closeSubmitDialog">取消</button>
-          <button class="workspace-btn workspace-btn-primary px-3 py-2 rounded-lg text-sm text-white bg-gradient-to-r from-ai-from to-ai-to disabled:opacity-60" :disabled="submittingNote" @click="submitNote">{{ submittingNote ? (isEditingNote ? '保存中...' : '提交中...') : (isEditingNote ? '保存修改' : '提交审核') }}</button>
+          <div class="submit-note-body custom-scrollbar">
+            <input
+              v-model="submitForm.title"
+              type="text"
+              class="submit-note-input submit-note-title-input"
+              placeholder="请输入手记标题"
+            />
+
+            <div class="grid grid-cols-1 gap-3 md:grid-cols-[1fr_1.18fr_1fr]">
+              <label class="submit-note-card submit-note-card-compact">
+                <div class="submit-note-card-head">
+                  <span class="submit-note-label">分类</span>
+                  <span class="submit-note-meta">自定义</span>
+                </div>
+                <input
+                  v-model="submitForm.category"
+                  type="text"
+                  class="submit-note-card-input"
+                  placeholder="例如：技术手记"
+                />
+              </label>
+
+              <div
+                ref="emojiPickerRef"
+                class="submit-note-card submit-note-icon-card"
+                @mouseenter="cancelEmojiPopoverClose"
+                @mouseleave="scheduleEmojiPopoverClose"
+              >
+                <div class="flex items-center justify-between gap-3">
+                  <div class="submit-note-card-head">
+                    <span class="submit-note-label">封面图标</span>
+                    <span class="submit-note-meta">选择封面</span>
+                  </div>
+                  <span class="submit-note-icon-preview">{{ submitForm.emoji }}</span>
+                </div>
+                <div class="submit-note-icon-grid">
+                  <button
+                    v-for="emoji in primaryEmojiOptions"
+                    :key="emoji"
+                    type="button"
+                    class="submit-note-icon"
+                    :class="{ 'submit-note-icon-active': submitForm.emoji === emoji }"
+                    @click="submitForm.emoji = emoji"
+                  >
+                    {{ emoji }}
+                  </button>
+                  <button
+                    type="button"
+                    class="submit-note-icon submit-note-icon-more"
+                    :class="{ 'submit-note-icon-more-active': showMoreEmojiPanel }"
+                    title="更多图标"
+                    aria-label="更多图标"
+                    @mouseenter="openEmojiPopover"
+                    @click="handleEmojiPopoverTrigger"
+                  >
+                    <span class="submit-note-icon-more-plus">+</span>
+                  </button>
+                </div>
+                <transition name="submit-note-pop">
+                  <div v-if="showMoreEmojiPanel" class="submit-note-icon-popover">
+                    <div class="submit-note-icon-popover-grid">
+                      <button
+                        v-for="emoji in moreEmojiOptions"
+                        :key="`more-${emoji}`"
+                        type="button"
+                        class="submit-note-icon submit-note-icon-pop"
+                        :class="{ 'submit-note-icon-active': submitForm.emoji === emoji }"
+                        @click="submitForm.emoji = emoji; showMoreEmojiPanel = false"
+                      >
+                        {{ emoji }}
+                      </button>
+                    </div>
+                  </div>
+                </transition>
+              </div>
+
+              <label class="submit-note-card submit-note-card-compact">
+                <div class="submit-note-card-head">
+                  <span class="submit-note-label">摘要</span>
+                  <span class="submit-note-meta">可选</span>
+                </div>
+                <input
+                  v-model="submitForm.summary"
+                  type="text"
+                  class="submit-note-card-input"
+                  placeholder="用一句话概括这篇内容"
+                />
+              </label>
+            </div>
+
+            <div class="submit-note-editor">
+              <div class="flex items-center justify-between gap-3">
+                <span class="submit-note-label">正文内容</span>
+                <span class="submit-note-hint">支持 Markdown</span>
+              </div>
+              <textarea
+                v-model="submitForm.content"
+                rows="10"
+                class="submit-note-textarea"
+                placeholder="写下你的思考、经验、方法或一瞬间的灵感..."
+              ></textarea>
+            </div>
+
+            <div class="submit-note-footnote">
+              {{ isEditingNote ? '保存后会重新进行内容规范检测；若命中不适宜发布的内容，会给出调整提示。' : '提交前会先进行内容规范检测；若命中违禁词或不适宜公开展示的内容，会提示修改。' }}
+            </div>
+          </div>
+
+          <div class="submit-note-footer">
+            <button class="submit-note-btn submit-note-btn-secondary" @click="closeSubmitDialog">取消</button>
+            <button class="submit-note-btn submit-note-btn-primary" :disabled="submittingNote" @click="submitNote">{{ submittingNote ? (isEditingNote ? '保存中...' : '提交中...') : (isEditingNote ? '保存修改' : '提交审核') }}</button>
+          </div>
+          </div>
         </div>
       </div>
-    </div>
+    </transition>
     <div v-if="commentPanelVisible" class="fixed inset-0 z-[1200] bg-black/25 backdrop-blur-[2px]" @click.self="closeComments">
-      <aside class="absolute right-0 top-0 h-full w-full max-w-[430px] bg-bg-card backdrop-blur-xl shadow-2xl border-l border-border-soft flex flex-col">
-        <header class="px-5 py-4 border-b border-black/5 flex items-center justify-between">
+      <aside class="note-comment-drawer absolute right-0 top-0 h-full w-full max-w-[430px] bg-bg-card backdrop-blur-xl shadow-2xl border-l border-border-soft flex flex-col">
+        <button
+          class="note-comment-mobile-close"
+          type="button"
+          @click="closeComments"
+          aria-label="关闭评论"
+        >
+          <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+          </svg>
+        </button>
+        <header class="note-comment-header px-5 py-4 border-b border-black/5 flex items-center justify-between">
           <div>
             <h3 class="text-base font-bold text-slate-800">手记评论</h3>
             <p class="text-xs text-slate-500 mt-1 line-clamp-1">{{ activeNote?.title || '' }}</p>
           </div>
-          <button class="workspace-btn workspace-btn-muted px-2.5 py-1 rounded-md bg-black/5 hover:bg-black/10 text-sm" @click="closeComments">关闭</button>
+          <button class="note-comment-desktop-close workspace-btn workspace-btn-muted px-2.5 py-1 rounded-md bg-black/5 hover:bg-black/10 text-sm" @click="closeComments">关闭</button>
         </header>
 
         <div class="flex-1 overflow-y-auto px-5 py-4 custom-scrollbar">
@@ -306,7 +450,7 @@
             maxlength="300"
             rows="3"
             placeholder="写下你的评论..."
-            class="workspace-control w-full border border-gray-200 rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-ai-from/25 resize-none disabled:bg-gray-50 disabled:text-gray-400"
+            class="workspace-control w-full border border-border-subtle bg-bg-surface text-text-primary rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-ai-from/25 resize-none disabled:bg-bg-elevated disabled:text-text-tertiary"
           ></textarea>
           <div class="mt-3 flex items-center justify-between">
             <span class="text-xs text-slate-500">{{ newCommentContent.length }}/300</span>
@@ -329,6 +473,7 @@ import { computed, onMounted, onUnmounted, reactive, ref } from 'vue'
 import AiSummaryBlock from '@/components/common/AiSummaryBlock.vue'
 import LoadingDots from '@/components/common/LoadingDots.vue'
 import TypeWriter from '@/components/common/TypeWriter.vue'
+import { useAutoPageRefresh } from '@/composables/useAutoPageRefresh'
 import { api } from '@/composables/useRequest'
 import { useAuthStore } from '@/stores/auth'
 
@@ -348,7 +493,14 @@ const submittingNote = ref(false)
 const submitDialogMode = ref('create')
 const editingNoteId = ref(null)
 const deletingNote = ref(false)
-const noteEmojiOptions = ['📘', '📗', '📙', '📕', '📝', '💡', '🧠', '🔧']
+const showMoreEmojiPanel = ref(false)
+const emojiPickerRef = ref(null)
+const primaryEmojiOptions = ['📘', '📝', '🧠', '🧰', '📊', '🎯', '🌱']
+const moreEmojiOptions = ['📚', '✅', '🧩', '✍️', '📖', '🗒️', '🧪', '🗂', '🪝', '🔍', '📡', '💡', '✨', '🌙', '💭', '🎨', '🌷', '🏗', '☕', '🗓', '📎', '🚨', '🪴']
+const noteEmojiOptions = Array.from(new Set([
+  ...primaryEmojiOptions,
+  ...moreEmojiOptions,
+]))
 const submitForm = reactive({
   title: '',
   category: '技术手记',
@@ -363,13 +515,23 @@ const comments = ref([])
 const loadingComments = ref(false)
 const submittingComment = ref(false)
 const newCommentContent = ref('')
+const mobileNoteTab = ref('list')
+
+const touchState = reactive({
+  startX: 0,
+  deltaX: 0,
+  active: false,
+})
 
 let viewSyncTimer = null
+let emojiPopoverCloseTimer = null
 
 const canSubmitNote = computed(() => authStore.isLoggedIn && !authStore.isGuest)
 const isViewingMine = computed(() => listMode.value === 'mine')
 const canInteractActiveNote = computed(() => !!activeNote.value?.id)
 const isEditingNote = computed(() => submitDialogMode.value === 'edit' && !!editingNoteId.value)
+
+const isNotesMobileViewport = () => typeof window !== 'undefined' && window.innerWidth < 1024
 
 const notesCountText = computed(() => (isViewingMine.value
   ? `共 ${notes.value.length} 篇我的投稿`
@@ -468,6 +630,12 @@ const applyNotesPayload = (res) => {
     if (!activeNote.value.content) {
       void hydrateNoteDetail(activeNote.value.id)
     }
+  } else if (!notes.value.length) {
+    activeNote.value = null
+  }
+
+  if (isNotesMobileViewport()) {
+    mobileNoteTab.value = activeNote.value ? mobileNoteTab.value : 'list'
   }
 }
 const loadPublishedNotes = async () => {
@@ -537,6 +705,7 @@ const switchNoteMode = async (mode) => {
   listMode.value = mode
   activeNote.value = null
   aiSummaries.value = []
+  mobileNoteTab.value = 'list'
   closeComments()
   await loadCurrentNotes()
 }
@@ -547,9 +716,53 @@ const setMineStatusFilter = async (status) => {
   if (isViewingMine.value) {
     activeNote.value = null
     aiSummaries.value = []
+    mobileNoteTab.value = 'list'
     closeComments()
     await loadMineNotes()
   }
+}
+
+const setMobileNoteTab = (tab) => {
+  if (tab === 'detail' && !activeNote.value) return
+  mobileNoteTab.value = tab
+}
+
+const resetTouchState = () => {
+  touchState.startX = 0
+  touchState.deltaX = 0
+  touchState.active = false
+}
+
+const handleTouchStart = (event) => {
+  if (!isNotesMobileViewport() || !event.touches?.length) return
+  const interactive = event.target?.closest?.('button, input, textarea, select, a')
+  if (interactive) {
+    resetTouchState()
+    return
+  }
+  touchState.startX = event.touches[0].clientX
+  touchState.deltaX = 0
+  touchState.active = true
+}
+
+const handleTouchMove = (event) => {
+  if (!touchState.active || !event.touches?.length) return
+  touchState.deltaX = event.touches[0].clientX - touchState.startX
+}
+
+const handleTouchEnd = () => {
+  if (!touchState.active) return
+  const absDeltaX = Math.abs(touchState.deltaX)
+  if (absDeltaX < 56) {
+    resetTouchState()
+    return
+  }
+  if (touchState.deltaX < 0 && mobileNoteTab.value === 'list' && activeNote.value) {
+    mobileNoteTab.value = 'detail'
+  } else if (touchState.deltaX > 0 && mobileNoteTab.value === 'detail') {
+    mobileNoteTab.value = 'list'
+  }
+  resetTouchState()
 }
 
 const syncViewCounts = async () => {
@@ -687,6 +900,9 @@ const selectNote = (note) => {
   activeNote.value = note
   aiSummaries.value = []
   isAiGenerating.value = false
+  if (isNotesMobileViewport()) {
+    mobileNoteTab.value = 'detail'
+  }
   if (commentPanelVisible.value) {
     closeComments()
   }
@@ -745,6 +961,51 @@ const fillSubmitFormByNote = (note) => {
   submitForm.content = note?.content || ''
 }
 
+const cancelEmojiPopoverClose = () => {
+  if (emojiPopoverCloseTimer) {
+    clearTimeout(emojiPopoverCloseTimer)
+    emojiPopoverCloseTimer = null
+  }
+}
+
+const closeEmojiPopover = () => {
+  cancelEmojiPopoverClose()
+  showMoreEmojiPanel.value = false
+}
+
+const openEmojiPopover = () => {
+  cancelEmojiPopoverClose()
+  showMoreEmojiPanel.value = true
+}
+
+const scheduleEmojiPopoverClose = () => {
+  cancelEmojiPopoverClose()
+  emojiPopoverCloseTimer = setTimeout(() => {
+    showMoreEmojiPanel.value = false
+    emojiPopoverCloseTimer = null
+  }, 180)
+}
+
+const handleEmojiPopoverTrigger = () => {
+  if (showMoreEmojiPanel.value) return
+  openEmojiPopover()
+}
+
+const handleEmojiPopoverOutside = (event) => {
+  if (!showMoreEmojiPanel.value) return
+  const root = emojiPickerRef.value
+  if (!root) return
+  const target = event.target
+  if (target instanceof Node && root.contains(target)) return
+  closeEmojiPopover()
+}
+
+const handleEmojiPopoverEscape = (event) => {
+  if (event.key !== 'Escape') return
+  if (!showMoreEmojiPanel.value) return
+  closeEmojiPopover()
+}
+
 const openSubmitDialog = () => {
   if (!authStore.isLoggedIn) {
     alert('请先登录后再投稿手记。')
@@ -756,6 +1017,7 @@ const openSubmitDialog = () => {
   }
   submitDialogMode.value = 'create'
   editingNoteId.value = null
+  showMoreEmojiPanel.value = false
   resetSubmitForm()
   showSubmitDialog.value = true
 }
@@ -787,6 +1049,7 @@ const openEditDialogFor = async (note) => {
   activeNote.value = editableNote
   submitDialogMode.value = 'edit'
   editingNoteId.value = editableNote.id
+  showMoreEmojiPanel.value = false
   fillSubmitFormByNote(editableNote)
   showSubmitDialog.value = true
 }
@@ -795,6 +1058,7 @@ const closeSubmitDialog = () => {
   showSubmitDialog.value = false
   submitDialogMode.value = 'create'
   editingNoteId.value = null
+  showMoreEmojiPanel.value = false
 }
 
 const submitNote = async () => {
@@ -886,19 +1150,82 @@ const deleteNote = async (note) => {
   }
 }
 
+useAutoPageRefresh(async () => {
+  await loadCurrentNotes()
+  if (commentPanelVisible.value && activeNote.value?.id) {
+    await loadComments(activeNote.value.id)
+  }
+}, {
+  throttleMs: 4000,
+})
+
 onMounted(async () => {
   await loadCurrentNotes()
   viewSyncTimer = setInterval(syncViewCounts, 5000)
+  document.addEventListener('pointerdown', handleEmojiPopoverOutside, true)
+  document.addEventListener('keydown', handleEmojiPopoverEscape)
 })
 
 onUnmounted(() => {
   if (viewSyncTimer) clearInterval(viewSyncTimer)
+  cancelEmojiPopoverClose()
+  document.removeEventListener('pointerdown', handleEmojiPopoverOutside, true)
+  document.removeEventListener('keydown', handleEmojiPopoverEscape)
 })
 </script>
 
 <style scoped>
 .notes-shell {
   background: var(--app-shell-bg);
+}
+
+.note-comment-drawer {
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0)),
+    var(--surface-panel-soft);
+}
+
+.note-comment-header {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  background: color-mix(in srgb, var(--surface-panel-soft) 92%, transparent);
+  backdrop-filter: blur(18px);
+}
+
+.note-comment-mobile-close {
+  position: absolute;
+  top: 12px;
+  right: 14px;
+  z-index: 6;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 999px;
+  border: 1px solid var(--border-soft);
+  background: color-mix(in srgb, var(--bg-elevated) 92%, transparent);
+  color: var(--text-secondary);
+  box-shadow: var(--shadow-card);
+}
+
+.note-comment-mobile-close:active {
+  transform: scale(0.96);
+}
+
+.note-comment-desktop-close {
+  display: none;
+}
+
+@media (min-width: 1024px) {
+  .note-comment-mobile-close {
+    display: none;
+  }
+
+  .note-comment-desktop-close {
+    display: inline-flex;
+  }
 }
 
 .notes-glow {
@@ -938,6 +1265,734 @@ onUnmounted(() => {
 .custom-scrollbar::-webkit-scrollbar-thumb {
   background: var(--border-light);
   border-radius: 999px;
+}
+
+.submit-note-overlay {
+  --submit-bg-page: #f6f7fb;
+  --submit-bg-modal: rgba(255, 255, 255, 0.78);
+  --submit-bg-card: rgba(255, 255, 255, 0.62);
+  --submit-bg-input: rgba(250, 250, 252, 0.9);
+  --submit-bg-soft: rgba(246, 247, 251, 0.86);
+  --submit-border-light: rgba(202, 207, 216, 0.28);
+  --submit-border-soft: rgba(214, 218, 226, 0.42);
+  --submit-divider: rgba(225, 228, 235, 0.72);
+  --submit-text-primary: #2b2f38;
+  --submit-text-secondary: #6f7684;
+  --submit-text-tertiary: #a2a8b5;
+  --submit-text-placeholder: #b7bcc8;
+  --submit-brand: #e79ab0;
+  --submit-brand-hover: #dc89a3;
+  --submit-brand-soft: rgba(231, 154, 176, 0.12);
+  --submit-brand-border: rgba(231, 154, 176, 0.22);
+  --submit-accent-blue: #a8bfdc;
+  --submit-accent-lilac: #c8c2dc;
+  --submit-accent-silver: #d8dde7;
+  --submit-ease: cubic-bezier(0.22, 1, 0.36, 1);
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  background: rgba(96, 103, 116, 0.24);
+}
+
+.dark .submit-note-overlay {
+  --submit-bg-page: #15111e;
+  --submit-bg-modal: rgba(22, 18, 32, 0.88);
+  --submit-bg-card: rgba(34, 28, 47, 0.8);
+  --submit-bg-input: rgba(28, 22, 40, 0.94);
+  --submit-bg-soft: rgba(22, 18, 32, 0.92);
+  --submit-border-light: rgba(255, 255, 255, 0.08);
+  --submit-border-soft: rgba(255, 255, 255, 0.14);
+  --submit-divider: rgba(255, 255, 255, 0.08);
+  --submit-text-primary: #f3eefb;
+  --submit-text-secondary: #c0b5d0;
+  --submit-text-tertiary: #958aa7;
+  --submit-text-placeholder: #7d738f;
+  --submit-brand: #d7bfdc;
+  --submit-brand-hover: #e6c6d8;
+  --submit-brand-soft: rgba(215, 191, 220, 0.14);
+  --submit-brand-border: rgba(215, 191, 220, 0.22);
+  --submit-accent-blue: #9ab1d5;
+  --submit-accent-lilac: #b8aad7;
+  --submit-accent-silver: #9e9bb7;
+  background: rgba(9, 7, 15, 0.58);
+}
+
+.dark .submit-note-dialog,
+.dark .submit-note-card,
+.dark .submit-note-icon,
+.dark .submit-note-icon-preview,
+.dark .submit-note-icon-popover,
+.dark .submit-note-city-row {
+  box-shadow: 0 24px 54px rgba(0, 0, 0, 0.28);
+}
+
+.dark .submit-note-header,
+.dark .submit-note-footer {
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.03), rgba(255, 255, 255, 0));
+}
+
+.dark .submit-note-close,
+.dark .submit-note-icon,
+.dark .submit-note-icon-preview {
+  background: rgba(32, 26, 45, 0.88);
+  color: var(--submit-text-secondary);
+}
+
+.dark .submit-note-card:hover,
+.dark .submit-note-icon:hover,
+.dark .submit-note-close:hover {
+  background: rgba(38, 31, 52, 0.94);
+}
+
+.submit-note-shell {
+  display: flex;
+  min-height: 100%;
+  width: 100%;
+  align-items: center;
+  justify-content: center;
+}
+
+.submit-note-dialog {
+  width: 100%;
+  max-width: 700px;
+  max-height: calc(100dvh - 56px);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border: 1px solid var(--border-subtle);
+  border-radius: 28px;
+  background: var(--submit-bg-page);
+  box-shadow: 0 28px 80px -42px rgba(43, 47, 56, 0.24), 0 18px 36px -30px rgba(43, 47, 56, 0.12);
+  will-change: transform, opacity;
+}
+
+.submit-note-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 20px 22px 16px;
+  border-bottom: 1px solid var(--submit-divider);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.22), rgba(255, 255, 255, 0));
+}
+
+.submit-note-title {
+  font-size: 23px;
+  line-height: 1.1;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: var(--submit-text-primary);
+}
+
+.submit-note-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 26px;
+  padding: 0 10px;
+  border: 1px solid var(--submit-brand-border);
+  border-radius: 999px;
+  background: linear-gradient(180deg, rgba(231, 154, 176, 0.13), rgba(231, 154, 176, 0.08));
+  color: #b37790;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+}
+
+.submit-note-subtitle {
+  margin-top: 8px;
+  font-size: 12.5px;
+  line-height: 1.7;
+  color: var(--submit-text-secondary);
+}
+
+.submit-note-close {
+  display: inline-flex;
+  height: 36px;
+  width: 36px;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--submit-border-light);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.48);
+  color: var(--submit-text-tertiary);
+  transition:
+    background 0.2s var(--submit-ease),
+    color 0.2s var(--submit-ease),
+    transform 0.2s var(--submit-ease),
+    box-shadow 0.2s var(--submit-ease),
+    border-color 0.2s var(--submit-ease);
+}
+
+.submit-note-close:hover {
+  background: rgba(255, 255, 255, 0.88);
+  color: var(--submit-text-secondary);
+  border-color: var(--submit-border-soft);
+  transform: translateY(-1px);
+  box-shadow: 0 10px 22px -18px rgba(43, 47, 56, 0.22);
+}
+
+.submit-note-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 16px 22px 18px;
+}
+
+.submit-note-input,
+.submit-note-card-input,
+.submit-note-textarea {
+  width: 100%;
+  border: 1px solid var(--submit-border-light);
+  background: var(--submit-bg-input);
+  color: var(--submit-text-primary);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.78),
+    0 12px 24px -26px rgba(43, 47, 56, 0.16);
+  transition:
+    border-color 0.2s var(--submit-ease),
+    box-shadow 0.2s var(--submit-ease),
+    background 0.2s var(--submit-ease),
+    transform 0.2s var(--submit-ease);
+}
+
+.submit-note-input::placeholder,
+.submit-note-card-input::placeholder,
+.submit-note-textarea::placeholder {
+  color: var(--submit-text-placeholder);
+}
+
+.submit-note-input:hover,
+.submit-note-card-input:hover,
+.submit-note-textarea:hover {
+  border-color: var(--submit-border-soft);
+  background: rgba(252, 252, 254, 0.96);
+}
+
+.submit-note-input:focus,
+.submit-note-card-input:focus,
+.submit-note-textarea:focus {
+  outline: none;
+  border-color: var(--submit-brand-border);
+  background: rgba(255, 255, 255, 0.96);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.84),
+    0 0 0 4px rgba(231, 154, 176, 0.08),
+    0 16px 30px -28px rgba(168, 191, 220, 0.28);
+}
+
+.submit-note-title-input {
+  min-height: 46px;
+  padding: 0 16px;
+  border-radius: 18px;
+  font-size: 14px;
+}
+
+.submit-note-card {
+  display: flex;
+  min-height: 112px;
+  flex-direction: column;
+  justify-content: space-between;
+  border: 1px solid var(--submit-border-light);
+  border-radius: 20px;
+  background: var(--submit-bg-card);
+  padding: 12px 14px;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.78),
+    0 14px 26px -28px rgba(43, 47, 56, 0.12);
+  transition:
+    border-color 0.2s var(--submit-ease),
+    box-shadow 0.2s var(--submit-ease),
+    transform 0.2s var(--submit-ease),
+    background 0.2s var(--submit-ease);
+}
+
+.submit-note-card:hover {
+  border-color: var(--submit-border-soft);
+  background: rgba(255, 255, 255, 0.7);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.82),
+    0 20px 34px -30px rgba(43, 47, 56, 0.16);
+  transform: translateY(-1px);
+}
+
+.submit-note-card-compact {
+  gap: 10px;
+}
+
+.submit-note-card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.submit-note-label {
+  display: inline-flex;
+  align-items: center;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--submit-text-secondary);
+  letter-spacing: 0.02em;
+}
+
+.submit-note-meta {
+  font-size: 11px;
+  color: var(--submit-text-tertiary);
+}
+
+.submit-note-card-input {
+  min-height: 42px;
+  border-radius: 16px;
+  padding: 0 14px;
+  font-size: 14px;
+}
+
+.submit-note-icon-preview {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 34px;
+  height: 34px;
+  padding: 0 10px;
+  border: 1px solid var(--submit-brand-border);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.72);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.8),
+    0 10px 20px -18px rgba(168, 191, 220, 0.2);
+}
+
+.submit-note-icon-grid {
+  display: grid;
+  grid-template-columns: repeat(8, minmax(0, 1fr));
+  gap: 6px;
+  margin-top: 10px;
+  align-items: stretch;
+}
+
+.submit-note-icon {
+  position: relative;
+  display: flex;
+  width: 100%;
+  min-width: 0;
+  min-height: 38px;
+  aspect-ratio: 1 / 1;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--submit-border-light);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.82);
+  color: var(--submit-text-secondary);
+  font-size: 18px;
+  line-height: 1;
+  transition:
+    transform 0.2s var(--submit-ease),
+    border-color 0.2s var(--submit-ease),
+    box-shadow 0.2s var(--submit-ease),
+    background 0.2s var(--submit-ease);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.82),
+    0 8px 18px -18px rgba(43, 47, 56, 0.14);
+}
+
+.submit-note-icon:hover {
+  transform: translateY(-1px);
+  border-color: var(--submit-border-soft);
+  background: rgba(255, 255, 255, 0.96);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.84),
+    0 14px 22px -18px rgba(168, 191, 220, 0.22);
+}
+
+.submit-note-icon:active {
+  transform: translateY(0);
+}
+
+.submit-note-icon-active {
+  border-color: var(--submit-brand-border);
+  background: var(--submit-brand-soft);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.88),
+    0 0 0 5px rgba(231, 154, 176, 0.14),
+    0 14px 24px -18px rgba(231, 154, 176, 0.28);
+  color: var(--submit-text-primary);
+  transform: translateY(-1px) scale(1.05);
+}
+
+.submit-note-icon-active::after {
+  content: '';
+  position: absolute;
+  right: 3px;
+  top: 3px;
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  background: var(--submit-brand);
+  box-shadow:
+    0 0 0 2px rgba(255, 255, 255, 0.94),
+    0 0 0 5px rgba(231, 154, 176, 0.08);
+}
+
+.submit-note-icon-more {
+  min-height: 38px;
+  padding: 0;
+  gap: 0;
+  font-size: 13px;
+  font-weight: 600;
+  aspect-ratio: 1 / 1;
+}
+
+.submit-note-icon-more-plus {
+  font-size: 18px;
+  line-height: 1;
+}
+
+.submit-note-icon-more-active {
+  border-color: var(--submit-brand-border);
+  background: rgba(255, 255, 255, 0.94);
+}
+
+.submit-note-icon-card {
+  position: relative;
+}
+
+.submit-note-icon-popover {
+  position: absolute;
+  top: calc(100% + 10px);
+  right: 0;
+  z-index: 5;
+  width: min(332px, calc(100vw - 72px));
+  padding: 12px;
+  border: 1px solid var(--submit-border-soft);
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.9);
+  box-shadow:
+    0 20px 40px -30px rgba(43, 47, 56, 0.18),
+    inset 0 1px 0 rgba(255, 255, 255, 0.82);
+  backdrop-filter: blur(16px);
+}
+
+.submit-note-icon-popover::before {
+  content: '';
+  position: absolute;
+  top: -7px;
+  right: 24px;
+  width: 14px;
+  height: 14px;
+  border-top: 1px solid var(--submit-border-soft);
+  border-left: 1px solid var(--submit-border-soft);
+  background: rgba(255, 255, 255, 0.94);
+  transform: rotate(45deg);
+}
+
+.submit-note-icon-popover::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: -12px;
+  height: 14px;
+}
+
+.submit-note-icon-popover-grid {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.submit-note-icon-pop {
+  width: 100%;
+}
+
+.submit-note-editor {
+  margin-top: 14px;
+  border: 1px solid var(--submit-border-soft);
+  border-radius: 22px;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.74), rgba(247, 248, 252, 0.74));
+  padding: 14px;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.82),
+    0 18px 34px -30px rgba(43, 47, 56, 0.14);
+  transition:
+    border-color 0.2s var(--submit-ease),
+    box-shadow 0.2s var(--submit-ease),
+    background 0.2s var(--submit-ease);
+}
+
+.submit-note-editor:hover {
+  border-color: var(--submit-border-soft);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.82), rgba(248, 249, 253, 0.8));
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.84),
+    0 22px 38px -30px rgba(43, 47, 56, 0.16);
+}
+
+.submit-note-hint {
+  font-size: 12px;
+  color: var(--submit-text-tertiary);
+}
+
+.submit-note-textarea {
+  min-height: 226px;
+  margin-top: 10px;
+  resize: vertical;
+  border-radius: 18px;
+  padding: 14px 16px;
+  font-size: 14px;
+  line-height: 1.75;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.84),
+    0 16px 30px -28px rgba(47, 42, 40, 0.2);
+}
+
+.submit-note-footnote {
+  margin-top: 16px;
+  padding: 0 2px;
+  color: var(--submit-text-tertiary);
+  font-size: 12px;
+  line-height: 1.7;
+}
+
+.submit-note-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  padding: 14px 22px 16px;
+  border-top: 1px solid var(--submit-divider);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.34), rgba(255, 255, 255, 0.48));
+}
+
+.submit-note-btn {
+  min-width: 94px;
+  min-height: 44px;
+  padding: 0 18px;
+  border-radius: 16px;
+  font-size: 14px;
+  font-weight: 600;
+  transition:
+    transform 0.2s var(--submit-ease),
+    box-shadow 0.2s var(--submit-ease),
+    background 0.2s var(--submit-ease),
+    border-color 0.2s var(--submit-ease),
+    opacity 0.2s var(--submit-ease);
+}
+
+.submit-note-btn:hover:not(:disabled) {
+  transform: translateY(-1px);
+}
+
+.submit-note-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.submit-note-btn-secondary {
+  border: 1px solid var(--submit-border-soft);
+  background: rgba(255, 255, 255, 0.72);
+  color: var(--submit-text-secondary);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.82);
+}
+
+.submit-note-btn-secondary:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.96);
+  border-color: var(--submit-border-soft);
+  box-shadow: 0 14px 24px -22px rgba(43, 47, 56, 0.16);
+}
+
+.submit-note-btn-primary {
+  border: 1px solid rgba(255, 169, 181, 0.44);
+  background: linear-gradient(135deg, #ffa9b5, #f6a4b1);
+  color: #fff;
+  box-shadow:
+    0 18px 30px -22px rgba(255, 169, 181, 0.34),
+    inset 0 1px 0 rgba(255, 255, 255, 0.22);
+}
+
+.submit-note-btn-primary:hover:not(:disabled) {
+  background: linear-gradient(135deg, #ff9ead, #f19fad);
+  box-shadow: 0 22px 36px -22px rgba(255, 169, 181, 0.4);
+}
+
+.submit-note-btn-primary:active:not(:disabled) {
+  transform: translateY(0);
+  box-shadow: 0 14px 24px -18px rgba(255, 169, 181, 0.32);
+}
+
+.dark .submit-note-input:hover,
+.dark .submit-note-card-input:hover,
+.dark .submit-note-textarea:hover,
+.dark .submit-note-card:hover,
+.dark .submit-note-editor:hover,
+.dark .submit-note-icon-popover,
+.dark .submit-note-editor,
+.dark .submit-note-btn-secondary,
+.dark .submit-note-format-example {
+  background: rgba(34, 28, 47, 0.92);
+}
+
+.dark .submit-note-input:focus,
+.dark .submit-note-card-input:focus,
+.dark .submit-note-textarea:focus {
+  background: rgba(40, 33, 55, 0.98);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.06),
+    0 0 0 4px rgba(215, 191, 220, 0.12),
+    0 16px 30px -28px rgba(0, 0, 0, 0.42);
+}
+
+.dark .submit-note-icon-popover::before {
+  background: rgba(34, 28, 47, 0.96);
+}
+
+.dark .submit-note-btn-secondary {
+  color: var(--submit-text-secondary);
+  border-color: var(--submit-border-soft);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05);
+}
+
+.dark .submit-note-btn-secondary:hover:not(:disabled) {
+  background: rgba(42, 35, 58, 0.96);
+}
+
+.submit-note-pop-enter-active,
+.submit-note-pop-leave-active {
+  transition: opacity 0.16s ease;
+}
+
+.submit-note-pop-enter-from,
+.submit-note-pop-leave-to {
+  opacity: 0;
+}
+
+.submit-note-fade-enter-active,
+.submit-note-fade-leave-active {
+  transition: opacity 0.34s var(--submit-ease), backdrop-filter 0.34s var(--submit-ease);
+}
+
+.submit-note-fade-enter-active .submit-note-dialog,
+.submit-note-fade-leave-active .submit-note-dialog {
+  transition:
+    opacity 0.34s var(--submit-ease),
+    transform 0.34s var(--submit-ease),
+    box-shadow 0.34s var(--submit-ease);
+}
+
+.submit-note-fade-enter-from,
+.submit-note-fade-leave-to {
+  opacity: 0;
+  backdrop-filter: blur(0);
+}
+
+.submit-note-fade-enter-from .submit-note-dialog,
+.submit-note-fade-leave-to .submit-note-dialog {
+  opacity: 0;
+  transform: translateY(16px) scale(0.985);
+  box-shadow: 0 10px 30px -24px rgba(43, 47, 56, 0.1);
+}
+
+@media (max-width: 768px) {
+  .submit-note-overlay {
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    padding:
+      max(86px, calc(env(safe-area-inset-top) + 76px))
+      10px
+      max(28px, calc(env(safe-area-inset-bottom) + 22px));
+  }
+
+  .submit-note-shell {
+    align-items: flex-start;
+    min-height: 100%;
+    padding-bottom: calc(env(safe-area-inset-bottom) + 12px);
+  }
+
+  .submit-note-dialog {
+    max-width: min(100%, 640px);
+    width: min(100%, calc(100vw - 20px));
+    max-height: calc(100svh - 128px - env(safe-area-inset-bottom));
+    margin-bottom: calc(env(safe-area-inset-bottom) + 8px);
+    border-radius: 22px;
+  }
+
+  .submit-note-header,
+  .submit-note-body,
+  .submit-note-footer {
+    padding-left: 14px;
+    padding-right: 14px;
+  }
+
+  .submit-note-header {
+    padding-top: 16px;
+    padding-bottom: 14px;
+  }
+
+  .submit-note-title {
+    font-size: 21px;
+  }
+
+  .submit-note-subtitle {
+    font-size: 12px;
+    line-height: 1.6;
+  }
+
+  .submit-note-body {
+    padding-top: 14px;
+    padding-bottom: 16px;
+  }
+
+  .submit-note-footer {
+    flex-wrap: wrap;
+    padding-top: 12px;
+    padding-bottom: calc(18px + env(safe-area-inset-bottom));
+    position: relative;
+    z-index: 1;
+  }
+
+  .submit-note-close {
+    flex-shrink: 0;
+  }
+
+  .submit-note-btn {
+    flex: 1 1 auto;
+    min-height: 42px;
+  }
+
+  .submit-note-title-input {
+    min-height: 44px;
+    font-size: 15px;
+  }
+
+  .submit-note-card {
+    min-height: 100px;
+    padding: 11px 12px;
+  }
+
+  .submit-note-textarea {
+    min-height: 200px;
+  }
+
+  .submit-note-icon-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 7px;
+  }
+
+  .submit-note-card-head {
+    align-items: flex-start;
+  }
+
+  .submit-note-icon-popover {
+    width: min(320px, calc(100vw - 40px));
+    right: -8px;
+  }
+
+  .submit-note-icon-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 7px;
+  }
 }
 
 .note-title,
