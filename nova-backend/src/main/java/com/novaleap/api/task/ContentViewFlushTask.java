@@ -37,7 +37,7 @@ public class ContentViewFlushTask {
         this.noteReadCacheSupport = noteReadCacheSupport;
     }
 
-    @Scheduled(fixedDelay = 3000, initialDelay = 8000)
+    @Scheduled(fixedDelay = 15000, initialDelay = 10000)
     public void flushBufferedViewCounts() {
         flushQuestionViews();
         flushNoteViews();

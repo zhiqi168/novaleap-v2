@@ -473,11 +473,15 @@ import { computed, onMounted, onUnmounted, reactive, ref } from 'vue'
 import AiSummaryBlock from '@/components/common/AiSummaryBlock.vue'
 import LoadingDots from '@/components/common/LoadingDots.vue'
 import TypeWriter from '@/components/common/TypeWriter.vue'
-import { useAutoPageRefresh } from '@/composables/useAutoPageRefresh'
 import { api } from '@/composables/useRequest'
 import { useAuthStore } from '@/stores/auth'
+import { useResourceCacheStore } from '@/stores/resourceCache'
 
 const authStore = useAuthStore()
+const resourceCacheStore = useResourceCacheStore()
+const NOTE_RUNTIME_NAMESPACE = 'notes'
+const NOTE_LIST_CACHE_TTL = 2 * 60 * 1000
+const NOTE_DETAIL_CACHE_TTL = 10 * 60 * 1000
 
 const notes = ref([])
 const loading = ref(false)
@@ -517,6 +521,40 @@ const submittingComment = ref(false)
 const newCommentContent = ref('')
 const mobileNoteTab = ref('list')
 
+const buildNotesListCacheKey = () => JSON.stringify({
+  mode: listMode.value,
+  keyword: searchQuery.value.trim(),
+  status: mineStatusFilter.value,
+})
+
+const buildNotesListSnapshot = () => ({
+  records: notes.value.map((item) => ({ ...item })),
+  activeNoteId: activeNote.value?.id || null,
+  mobileNoteTab: mobileNoteTab.value,
+})
+
+const applyNotesListSnapshot = (snapshot) => {
+  notes.value = Array.isArray(snapshot?.records) ? snapshot.records.map((item) => ({ ...item })) : []
+  const activeId = Number(snapshot?.activeNoteId || 0)
+  activeNote.value = activeId > 0
+    ? notes.value.find((item) => Number(item?.id || 0) === activeId) || null
+    : null
+  if (!activeNote.value && notes.value.length) {
+    activeNote.value = notes.value[0]
+  }
+  mobileNoteTab.value = snapshot?.mobileNoteTab || (activeNote.value ? 'detail' : 'list')
+}
+
+const persistNotesListSnapshot = () => {
+  resourceCacheStore.writeList(NOTE_RUNTIME_NAMESPACE, buildNotesListCacheKey(), buildNotesListSnapshot())
+}
+
+const persistNoteDetailSnapshot = (note = activeNote.value) => {
+  const noteId = Number(note?.id || 0)
+  if (!noteId) return
+  resourceCacheStore.writeDetail(NOTE_RUNTIME_NAMESPACE, noteId, { ...note })
+}
+
 const touchState = reactive({
   startX: 0,
   deltaX: 0,
@@ -524,7 +562,6 @@ const touchState = reactive({
 })
 const noteViewFloorMap = ref(new Map())
 
-let viewSyncTimer = null
 let emojiPopoverCloseTimer = null
 
 const canSubmitNote = computed(() => authStore.isLoggedIn && !authStore.isGuest)
@@ -636,22 +673,46 @@ const buildMineNotesUrl = () => {
   return url
 }
 
-const hydrateNoteDetail = async (noteId) => {
+const hydrateNoteDetail = async (noteId, options = {}) => {
+  const { force = false } = options
   if (!noteId) return
+  if (!force) {
+    const cached = resourceCacheStore.readDetail(NOTE_RUNTIME_NAMESPACE, noteId, NOTE_DETAIL_CACHE_TTL)
+    if (cached) {
+      const detail = applyLocalNoteViewFloor(cached)
+      rememberLocalNoteViewCount(detail.id, detail.views)
+      activeNote.value = detail
+      patchNoteInList(detail)
+      persistNoteDetailSnapshot(detail)
+      return
+    }
+  }
   try {
-    const res = await api.get(`/api/notes/${noteId}`)
-    if (res.code !== 200 || !res.data) return
-    const detail = applyLocalNoteViewFloor(toNoteView(res.data))
+    const detail = await resourceCacheStore.loadDetail(
+      NOTE_RUNTIME_NAMESPACE,
+      noteId,
+      async () => {
+        const res = await api.get(`/api/notes/${noteId}`)
+        if (res.code !== 200 || !res.data) {
+          throw new Error(res.msg || '加载手记详情失败')
+        }
+        return applyLocalNoteViewFloor(toNoteView(res.data))
+      },
+      { ttlMs: NOTE_DETAIL_CACHE_TTL, force },
+    )
     rememberLocalNoteViewCount(detail.id, detail.views)
     activeNote.value = detail
     patchNoteInList(detail)
+    persistNoteDetailSnapshot(detail)
   } catch (_) {
     // noop
   }
 }
 
-const applyNotesPayload = (res) => {
-  notes.value = (res.data?.records || []).map(toNoteView).map(applyLocalNoteViewFloor)
+const applyNotesPayload = (payload) => {
+  notes.value = Array.isArray(payload?.records)
+    ? payload.records.map((item) => ({ ...item }))
+    : (payload.data?.records || []).map(toNoteView).map(applyLocalNoteViewFloor)
   if ((!activeNote.value || !notes.value.find((n) => n.id === activeNote.value.id)) && notes.value.length) {
     activeNote.value = notes.value[0]
     if (!activeNote.value.content) {
@@ -664,15 +725,43 @@ const applyNotesPayload = (res) => {
   if (isNotesMobileViewport()) {
     mobileNoteTab.value = activeNote.value ? mobileNoteTab.value : 'list'
   }
+  persistNotesListSnapshot()
 }
-const loadPublishedNotes = async () => {
+const loadPublishedNotes = async (options = {}) => {
+  const { force = false } = options
+  const cacheKey = buildNotesListCacheKey()
+  if (!force) {
+    const cached = resourceCacheStore.readList(NOTE_RUNTIME_NAMESPACE, cacheKey, NOTE_LIST_CACHE_TTL)
+    if (cached) {
+      applyNotesListSnapshot(cached)
+      if (activeNote.value && !activeNote.value.content) {
+        void hydrateNoteDetail(activeNote.value.id)
+      }
+      return
+    }
+  }
   loading.value = true
   try {
-    const res = await api.get(buildPublishedNotesUrl())
-    if (res.code === 200) {
-      applyNotesPayload(res)
-    } else {
-      notes.value = []
+    const snapshot = await resourceCacheStore.loadList(
+      NOTE_RUNTIME_NAMESPACE,
+      cacheKey,
+      async () => {
+        const res = await api.get(buildPublishedNotesUrl())
+        if (res.code !== 200) {
+          throw new Error(res.msg || '加载手记列表失败')
+        }
+        const records = (res.data?.records || []).map(toNoteView).map(applyLocalNoteViewFloor)
+        return {
+          records,
+          activeNoteId: activeNote.value?.id || records[0]?.id || null,
+          mobileNoteTab: mobileNoteTab.value,
+        }
+      },
+      { ttlMs: NOTE_LIST_CACHE_TTL, force },
+    )
+    applyNotesListSnapshot(snapshot)
+    if (activeNote.value && !activeNote.value.content) {
+      void hydrateNoteDetail(activeNote.value.id)
     }
   } catch (_) {
     notes.value = []
@@ -681,7 +770,7 @@ const loadPublishedNotes = async () => {
   }
 }
 
-const loadMineNotes = async () => {
+const loadMineNotesLegacy = async () => {
   loading.value = true
   try {
     const res = await api.get(buildMineNotesUrl())
@@ -709,12 +798,62 @@ const loadMineNotes = async () => {
   }
 }
 
-const loadCurrentNotes = async () => {
+const loadMineNotes = async (options = {}) => {
+  const { force = false } = options
+  const cacheKey = buildNotesListCacheKey()
+  if (!force) {
+    const cached = resourceCacheStore.readList(NOTE_RUNTIME_NAMESPACE, cacheKey, NOTE_LIST_CACHE_TTL)
+    if (cached) {
+      applyNotesListSnapshot(cached)
+      if (activeNote.value && !activeNote.value.content) {
+        void hydrateNoteDetail(activeNote.value.id)
+      }
+      return
+    }
+  }
+  loading.value = true
+  try {
+    const snapshot = await resourceCacheStore.loadList(
+      NOTE_RUNTIME_NAMESPACE,
+      cacheKey,
+      async () => {
+        const res = await api.get(buildMineNotesUrl())
+        if (res.code !== 200) {
+          throw new Error(res.msg || '加载我的手记失败')
+        }
+        const keyword = searchQuery.value.trim().toLowerCase()
+        const filteredRecords = !keyword
+          ? (res.data?.records || [])
+          : (res.data?.records || []).filter((item) => String(item?.title || '').toLowerCase().includes(keyword))
+        const records = filteredRecords.map(toNoteView).map(applyLocalNoteViewFloor)
+        return {
+          records,
+          activeNoteId: activeNote.value?.id || records[0]?.id || null,
+          mobileNoteTab: mobileNoteTab.value,
+        }
+      },
+      { ttlMs: NOTE_LIST_CACHE_TTL, force },
+    )
+    applyNotesListSnapshot(snapshot)
+    if (activeNote.value && !activeNote.value.content) {
+      void hydrateNoteDetail(activeNote.value.id)
+    }
+  } catch (e) {
+    notes.value = []
+    if (e?.message) {
+      alert(e.message)
+    }
+  } finally {
+    loading.value = false
+  }
+}
+
+const loadCurrentNotes = async (options = {}) => {
   if (isViewingMine.value) {
-    await loadMineNotes()
+    await loadMineNotes(options)
     return
   }
-  await loadPublishedNotes()
+  await loadPublishedNotes(options)
 }
 
 const switchNoteMode = async (mode) => {
@@ -792,33 +931,11 @@ const handleTouchEnd = () => {
   resetTouchState()
 }
 
-const syncViewCounts = async () => {
-  if (!notes.value.length || isViewingMine.value) return
-  try {
-    const res = await api.get(buildPublishedNotesUrl())
-    if (res.code !== 200) return
-    const fresh = (res.data?.records || []).map(toNoteView).map(applyLocalNoteViewFloor)
-    const viewMap = new Map(fresh.map((n) => [n.id, n.views]))
-    notes.value = notes.value.map((n) => {
-      if (!viewMap.has(n.id)) return n
-      const nextViews = Math.max(Number(n.views || 0), Number(viewMap.get(n.id) || 0))
-      rememberLocalNoteViewCount(n.id, nextViews)
-      return { ...n, views: nextViews }
-    })
-    if (activeNote.value && viewMap.has(activeNote.value.id)) {
-      const nextViews = Math.max(Number(activeNote.value.views || 0), Number(viewMap.get(activeNote.value.id) || 0))
-      rememberLocalNoteViewCount(activeNote.value.id, nextViews)
-      activeNote.value = { ...activeNote.value, views: nextViews }
-    }
-  } catch (_) {
-    // noop
-  }
-}
-
 const patchNoteInList = (next) => {
   if (!next?.id) return
   const patched = applyLocalNoteViewFloor(next)
   notes.value = notes.value.map((item) => (item.id === patched.id ? { ...item, ...patched } : item))
+  persistNotesListSnapshot()
 }
 
 const toggleLike = async () => {
@@ -844,6 +961,7 @@ const toggleLike = async () => {
       likeCount: Number(res.data?.likeCount || 0),
     }
     activeNote.value = { ...activeNote.value, ...next }
+    persistNoteDetailSnapshot(activeNote.value)
     patchNoteInList(next)
   } catch (e) {
     alert(e.message || '点赞失败，请稍后重试')
@@ -922,6 +1040,7 @@ const submitComment = async () => {
       commentCount: Number(activeNote.value.commentCount || 0) + 1,
     }
     activeNote.value = { ...activeNote.value, ...next }
+    persistNoteDetailSnapshot(activeNote.value)
     patchNoteInList(next)
   } catch (e) {
     alert(e.message || '评论发送失败，请稍后重试')
@@ -933,6 +1052,7 @@ const submitComment = async () => {
 const selectNote = (note) => {
   const isCurrentSelected = String(activeNote.value?.id ?? '') === String(note?.id ?? '')
   activeNote.value = applyLocalNoteViewFloor(note)
+  persistNoteDetailSnapshot(activeNote.value)
   aiSummaries.value = []
   isAiGenerating.value = false
   if (isNotesMobileViewport()) {
@@ -950,16 +1070,29 @@ const selectNote = (note) => {
   }
 
   const viewApi = isCurrentSelected || isViewingMine.value || Number(note.status) !== 1
-    ? api.get(`/api/notes/${note.id}`)
+    ? resourceCacheStore.loadDetail(
+      NOTE_RUNTIME_NAMESPACE,
+      note.id,
+      async () => {
+        const res = await api.get(`/api/notes/${note.id}`)
+        if (res.code !== 200 || !res.data) {
+          throw new Error(res.msg || '加载手记详情失败')
+        }
+        return applyLocalNoteViewFloor(toNoteView(res.data))
+      },
+      { ttlMs: NOTE_DETAIL_CACHE_TTL },
+    )
     : api.post(`/api/notes/${note.id}/view`)
 
   viewApi
     .then((res) => {
-      if (res.code !== 200 || !res.data) return
-      const detail = applyLocalNoteViewFloor(toNoteView(res.data))
+      const detail = res?.data
+        ? applyLocalNoteViewFloor(toNoteView(res.data))
+        : applyLocalNoteViewFloor(res)
       rememberLocalNoteViewCount(detail.id, detail.views)
       activeNote.value = detail
       patchNoteInList(detail)
+      persistNoteDetailSnapshot(detail)
     })
     .catch(() => {})
 }
@@ -1152,7 +1285,11 @@ const submitNote = async () => {
     if (!editingNow) {
       mineStatusFilter.value = ''
     }
-    await loadCurrentNotes()
+    resourceCacheStore.invalidateLists(NOTE_RUNTIME_NAMESPACE)
+    if (editingId) {
+      resourceCacheStore.invalidateDetail(NOTE_RUNTIME_NAMESPACE, editingId)
+    }
+    await loadCurrentNotes({ force: true })
   } catch (e) {
     alert(e.message || '操作失败，请稍后重试。')
   } finally {
@@ -1185,22 +1322,15 @@ const deleteNote = async (note) => {
       aiSummaries.value = []
     }
     alert('手记已删除。')
-    await loadCurrentNotes()
+    resourceCacheStore.invalidateLists(NOTE_RUNTIME_NAMESPACE)
+    resourceCacheStore.invalidateDetail(NOTE_RUNTIME_NAMESPACE, note.id)
+    await loadCurrentNotes({ force: true })
   } catch (e) {
     alert(e.message || '删除失败，请稍后重试。')
   } finally {
     deletingNote.value = false
   }
 }
-
-useAutoPageRefresh(async () => {
-  await loadCurrentNotes()
-  if (commentPanelVisible.value && activeNote.value?.id) {
-    await loadComments(activeNote.value.id)
-  }
-}, {
-  throttleMs: 10000,
-})
 
 onMounted(async () => {
   await loadCurrentNotes()
@@ -1209,7 +1339,6 @@ onMounted(async () => {
 })
 
 onUnmounted(() => {
-  if (viewSyncTimer) clearInterval(viewSyncTimer)
   cancelEmojiPopoverClose()
   document.removeEventListener('pointerdown', handleEmojiPopoverOutside, true)
   document.removeEventListener('keydown', handleEmojiPopoverEscape)

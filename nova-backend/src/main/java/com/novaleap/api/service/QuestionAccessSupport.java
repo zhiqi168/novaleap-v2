@@ -9,6 +9,8 @@ import com.novaleap.api.module.system.security.CurrentUserService;
 import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Service;
 
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+
 import java.util.Objects;
 
 @Service
@@ -77,7 +79,24 @@ public class QuestionAccessSupport {
         if (questionId == null) {
             return null;
         }
-        Question question = questionMapper.selectById(questionId);
+        LambdaQueryWrapper<Question> wrapper = new LambdaQueryWrapper<>();
+        wrapper.select(
+                        Question::getId,
+                        Question::getTitle,
+                        Question::getContent,
+                        Question::getStandardAnswer,
+                        Question::getDifficulty,
+                        Question::getCategory,
+                        Question::getTags,
+                        Question::getViewCount,
+                        Question::getStatus,
+                        Question::getSourceType,
+                        Question::getCustomBankId,
+                        Question::getOwnerUserId
+                )
+                .eq(Question::getId, questionId)
+                .last("LIMIT 1");
+        Question question = questionMapper.selectOne(wrapper);
         if (question == null || question.getStatus() == null || question.getStatus() != 1) {
             return null;
         }

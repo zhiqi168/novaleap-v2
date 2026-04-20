@@ -88,12 +88,14 @@ public class AdminNoteApplicationService {
         note.setEmoji(request.getEmoji());
         note.setAuthor(request.getAuthor());
         note.setStatus(request.getStatus() != null ? request.getStatus() : 1);
+        note.setViewCount(0);
         note.setCreatedAt(LocalDateTime.now());
         note.setUpdatedAt(LocalDateTime.now());
         
         noteMapper.insert(note);
         noteReadCacheSupport.evictPublicLists();
         noteReadCacheSupport.evictAllMineLists();
+        noteReadCacheSupport.resetNoteViewCount(note.getId(), note.getViewCount());
         return AdminNoteViewAssembler.toDetailVO(note);
     }
 
@@ -117,6 +119,7 @@ public class AdminNoteApplicationService {
         
         noteMapper.updateById(note);
         noteReadCacheSupport.evictNoteReadCaches(id);
+        noteReadCacheSupport.resetNoteViewCount(id, note.getViewCount());
         return AdminNoteViewAssembler.toDetailVO(note);
     }
 
@@ -146,6 +149,7 @@ public class AdminNoteApplicationService {
         noteReadCacheSupport.evictNoteReadCaches(id);
         
         Note refreshed = noteMapper.selectById(id);
+        noteReadCacheSupport.resetNoteViewCount(id, refreshed == null ? 0 : refreshed.getViewCount());
         return AdminNoteViewAssembler.toDetailVO(refreshed);
     }
 
@@ -157,5 +161,6 @@ public class AdminNoteApplicationService {
         }
         noteMapper.deleteById(id);
         noteReadCacheSupport.evictNoteReadCaches(id);
+        noteReadCacheSupport.evictNoteViewCount(id);
     }
 }

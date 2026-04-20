@@ -140,7 +140,7 @@
               leave-to-class="opacity-0"
               mode="out-in"
             >
-              <keep-alive :include="['Home', 'QuestionBank', 'Me']">
+              <keep-alive :include="['Home', 'QuestionBank', 'Notes', 'Me']">
                 <component :is="Component" />
               </keep-alive>
             </transition>

@@ -90,6 +90,7 @@ public class AdminQuestionApplicationService {
         question.setCreatedAt(LocalDateTime.now());
         questionMapper.insert(question);
         questionReadCacheSupport.evictAllQuestionReadCaches();
+        questionReadCacheSupport.resetOfficialQuestionViewCount(question.getId(), question.getViewCount());
         return toVO(question, loadCategoryOptions());
     }
 
@@ -106,6 +107,7 @@ public class AdminQuestionApplicationService {
         questionReadCacheSupport.evictAllQuestionReadCaches();
         questionReadCacheSupport.evictQuestionDetail(id);
         questionReadCacheSupport.evictQuestionAnswer(id);
+        questionReadCacheSupport.resetOfficialQuestionViewCount(id, question.getViewCount());
         return toVO(question, loadCategoryOptions());
     }
 
@@ -115,6 +117,7 @@ public class AdminQuestionApplicationService {
         questionReadCacheSupport.evictAllQuestionReadCaches();
         questionReadCacheSupport.evictQuestionDetail(id);
         questionReadCacheSupport.evictQuestionAnswer(id);
+        questionReadCacheSupport.evictOfficialQuestionViewCount(id);
     }
 
     public List<AdminQuestionCategoryVO> getQuestionCategoryList() {

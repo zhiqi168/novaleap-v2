@@ -106,4 +106,12 @@ public class NoteController {
         noteApplicationService.deleteNote(id, authentication);
         return Result.success();
     }
+
+    @GetMapping("/hot")
+    public Result<List<NoteListItemVO>> getHotNotes(
+            @RequestParam(value = "limit", defaultValue = "10") Integer limit,
+            Authentication authentication
+    ) {
+        return Result.success(noteApplicationService.getHotNoteList(limit, authentication));
+    }
 }

@@ -1,7 +1,6 @@
 package com.novaleap.api.module.question.service;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
-import com.baomidou.mybatisplus.core.conditions.update.UpdateWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.novaleap.api.common.exception.NotFoundException;
 import com.novaleap.api.entity.CustomQuestionBank;
@@ -35,6 +34,8 @@ import java.util.concurrent.ThreadLocalRandom;
 public class QuestionApplicationService {
 
     private static final int MAX_PAGE_SIZE = 50;
+    private static final int DEFAULT_HOT_LIMIT = 10;
+    private static final int MAX_HOT_LIMIT = 20;
     private static final int HOT_KEY_RETRY_TIMES = 3;
     private static final long HOT_KEY_RETRY_SLEEP_MS = 40L;
     private static final String QUESTION_NOT_FOUND_MESSAGE = "\u9898\u76ee\u4e0d\u5b58\u5728";
@@ -88,6 +89,7 @@ public class QuestionApplicationService {
 
         Page<QuestionListItemVO> cached = questionReadCacheSupport.readQuestionListPage(cacheKey);
         if (cached != null) {
+            applyResolvedQuestionListViewCounts(cached);
             log.info("[perf][question-list] cache-hit bankId={} page={} size={} category={} difficulty={} keyword={} records={} total={} tookMs={}",
                     bankId, normalizePage(page), normalizeSize(size), safe(category), difficulty, safe(keyword),
                     cached.getRecords() == null ? 0 : cached.getRecords().size(), cached.getTotal(), elapsedMs(startNs));
@@ -96,6 +98,16 @@ public class QuestionApplicationService {
 
         Page<Question> pageParam = new Page<>(normalizePage(page), normalizeSize(size));
         LambdaQueryWrapper<Question> wrapper = buildQuestionFilterWrapper(category, difficulty, keyword, bankId, bank != null);
+        wrapper.select(
+                Question::getId,
+                Question::getTitle,
+                Question::getDifficulty,
+                Question::getCategory,
+                Question::getTags,
+                Question::getViewCount,
+                Question::getSourceType,
+                Question::getCreatedAt
+        );
         wrapper.orderByDesc(Question::getCreatedAt);
 
         Page<Question> result = questionMapper.selectPage(pageParam, wrapper);
@@ -104,6 +116,7 @@ public class QuestionApplicationService {
                 .map(this::toQuestionListItemVO)
                 .toList());
         questionReadCacheSupport.writeQuestionListPage(cacheKey, voPage);
+        applyResolvedQuestionListViewCounts(voPage);
         log.info("[perf][question-list] cache-miss bankId={} page={} size={} category={} difficulty={} keyword={} records={} total={} tookMs={}",
                 bankId, normalizePage(page), normalizeSize(size), safe(category), difficulty, safe(keyword),
                 voPage.getRecords() == null ? 0 : voPage.getRecords().size(), voPage.getTotal(), elapsedMs(startNs));
@@ -128,6 +141,7 @@ public class QuestionApplicationService {
         long startNs = System.nanoTime();
         QuestionDetailVO cached = questionReadCacheSupport.readOfficialQuestionDetail(id);
         if (cached != null) {
+            cached.setViewCount(questionReadCacheSupport.resolveOfficialQuestionViewCount(id, cached.getViewCount()));
             log.info("[perf][question-detail] cache-hit id={} tookMs={}", id, elapsedMs(startNs));
             return cached;
         }
@@ -136,6 +150,7 @@ public class QuestionApplicationService {
         if (lockToken == null) {
             QuestionDetailVO waitedCache = waitForOfficialQuestionDetailCache(id);
             if (waitedCache != null) {
+                waitedCache.setViewCount(questionReadCacheSupport.resolveOfficialQuestionViewCount(id, waitedCache.getViewCount()));
                 log.info("[perf][question-detail] cache-hit-after-wait id={} tookMs={}", id, elapsedMs(startNs));
                 return waitedCache;
             }
@@ -145,6 +160,7 @@ public class QuestionApplicationService {
             if (lockToken != null) {
                 QuestionDetailVO doubleChecked = questionReadCacheSupport.readOfficialQuestionDetail(id);
                 if (doubleChecked != null) {
+                    doubleChecked.setViewCount(questionReadCacheSupport.resolveOfficialQuestionViewCount(id, doubleChecked.getViewCount()));
                     log.info("[perf][question-detail] cache-hit-after-lock id={} tookMs={}", id, elapsedMs(startNs));
                     return doubleChecked;
                 }
@@ -156,6 +172,7 @@ public class QuestionApplicationService {
             }
 
             QuestionDetailVO detail = toQuestionDetailVO(question);
+            detail.setViewCount(questionReadCacheSupport.resolveOfficialQuestionViewCount(id, detail.getViewCount()));
             if (isOfficialQuestion(question)) {
                 questionReadCacheSupport.writeOfficialQuestionDetail(id, detail);
                 questionReadCacheSupport.writeOfficialQuestionAnswer(id, buildAnswerVO(question));
@@ -170,11 +187,11 @@ public class QuestionApplicationService {
 
     public QuestionViewCountVO increaseQuestionView(Long id, Authentication authentication) {
         long startNs = System.nanoTime();
-        Integer cachedViewCount = questionReadCacheSupport.readOfficialQuestionViewCount(id);
-        if (cachedViewCount != null) {
-            int nextCount = cachedViewCount + 1;
-            questionReadCacheSupport.incrementPendingViewCount(id);
-            questionReadCacheSupport.touchOfficialQuestionDetailViewCount(id, nextCount);
+        QuestionDetailVO cachedDetail = questionReadCacheSupport.readOfficialQuestionDetail(id);
+        if (cachedDetail != null) {
+            int nextCount = questionReadCacheSupport.incrementAndGetOfficialQuestionViewCount(id, cachedDetail.getViewCount() == null ? 0 : cachedDetail.getViewCount());
+            cachedDetail.setViewCount(nextCount);
+            questionReadCacheSupport.writeOfficialQuestionDetail(id, cachedDetail);
             log.info("[perf][question-view] buffered id={} nextCount={} tookMs={}", id, nextCount, elapsedMs(startNs));
             return new QuestionViewCountVO(id, nextCount);
         }
@@ -184,8 +201,7 @@ public class QuestionApplicationService {
             throw new NotFoundException(QUESTION_NOT_FOUND_MESSAGE);
         }
 
-        questionReadCacheSupport.incrementPendingViewCount(id);
-        int nextCount = (question.getViewCount() == null ? 0 : question.getViewCount()) + 1;
+        int nextCount = questionReadCacheSupport.incrementAndGetOfficialQuestionViewCount(id, question.getViewCount() == null ? 0 : question.getViewCount());
         if (isOfficialQuestion(question)) {
             QuestionDetailVO detail = toQuestionDetailVO(question);
             detail.setViewCount(nextCount);
@@ -240,6 +256,7 @@ public class QuestionApplicationService {
         if (bankId == null) {
             QuestionDetailVO cached = questionReadCacheSupport.readOfficialQuestionDetail(randomId);
             if (cached != null) {
+                cached.setViewCount(questionReadCacheSupport.resolveOfficialQuestionViewCount(randomId, cached.getViewCount()));
                 log.info("[perf][question-random] poolCacheHit={} detailCacheHit=true bankId={} category={} difficulty={} candidateSize={} questionId={} tookMs={}",
                         poolCacheHit, bankId, safe(category), difficulty, candidateIds.size(), randomId, elapsedMs(startNs));
                 return cached;
@@ -252,6 +269,7 @@ public class QuestionApplicationService {
         }
 
         QuestionDetailVO detail = toQuestionDetailVO(question);
+        detail.setViewCount(questionReadCacheSupport.resolveOfficialQuestionViewCount(question.getId(), detail.getViewCount()));
         if (isOfficialQuestion(question)) {
             questionReadCacheSupport.writeOfficialQuestionDetail(question.getId(), detail);
             questionReadCacheSupport.writeOfficialQuestionAnswer(question.getId(), buildAnswerVO(question));
@@ -302,6 +320,57 @@ public class QuestionApplicationService {
         } finally {
             questionReadCacheSupport.unlockOfficialQuestionAnswer(id, lockToken);
         }
+    }
+
+    public List<QuestionListItemVO> getHotQuestionList(Integer limit, Authentication authentication) {
+        int finalLimit = normalizeHotLimit(limit);
+        List<Long> hotIds = questionReadCacheSupport.readHotQuestionIds(finalLimit);
+        if (hotIds.isEmpty()) {
+            LambdaQueryWrapper<Question> wrapper = buildQuestionFilterWrapper(null, null, null, null, false);
+            wrapper.select(
+                            Question::getId,
+                            Question::getTitle,
+                            Question::getDifficulty,
+                            Question::getCategory,
+                            Question::getTags,
+                            Question::getViewCount,
+                            Question::getSourceType
+                    )
+                    .orderByDesc(Question::getViewCount)
+                    .orderByDesc(Question::getCreatedAt)
+                    .last("LIMIT " + finalLimit);
+            List<QuestionListItemVO> fallback = questionMapper.selectList(wrapper).stream()
+                    .map(this::toQuestionListItemVO)
+                    .toList();
+            applyResolvedQuestionListViewCounts(fallback);
+            return fallback;
+        }
+
+        Map<Long, Integer> orderMap = new LinkedHashMap<>();
+        for (int i = 0; i < hotIds.size(); i++) {
+            orderMap.put(hotIds.get(i), i);
+        }
+        LambdaQueryWrapper<Question> wrapper = buildQuestionFilterWrapper(null, null, null, null, false);
+        wrapper.select(
+                        Question::getId,
+                        Question::getTitle,
+                        Question::getDifficulty,
+                        Question::getCategory,
+                        Question::getTags,
+                        Question::getViewCount,
+                        Question::getSourceType
+                )
+                .in(Question::getId, hotIds);
+        List<QuestionListItemVO> hotList = questionMapper.selectList(wrapper).stream()
+                .map(this::toQuestionListItemVO)
+                .sorted((left, right) -> Integer.compare(
+                        orderMap.getOrDefault(left.getId(), Integer.MAX_VALUE),
+                        orderMap.getOrDefault(right.getId(), Integer.MAX_VALUE)
+                ))
+                .limit(finalLimit)
+                .toList();
+        applyResolvedQuestionListViewCounts(hotList);
+        return hotList;
     }
 
     private String resolveSourceLabel(Question question) {
@@ -455,6 +524,36 @@ public class QuestionApplicationService {
         return emptyPage;
     }
 
+    private void applyResolvedQuestionListViewCounts(Page<QuestionListItemVO> page) {
+        if (page == null) {
+            return;
+        }
+        applyResolvedQuestionListViewCounts(page.getRecords());
+    }
+
+    private void applyResolvedQuestionListViewCounts(List<QuestionListItemVO> records) {
+        if (records == null || records.isEmpty()) {
+            return;
+        }
+        Map<Long, Integer> fallbackMap = new LinkedHashMap<>();
+        for (QuestionListItemVO record : records) {
+            if (record == null || record.getId() == null) {
+                continue;
+            }
+            fallbackMap.put(record.getId(), record.getViewCount() == null ? 0 : record.getViewCount());
+        }
+        Map<Long, Integer> mergedMap = questionReadCacheSupport.resolveOfficialQuestionViewCountMap(fallbackMap);
+        for (QuestionListItemVO record : records) {
+            if (record == null || record.getId() == null) {
+                continue;
+            }
+            Integer mergedCount = mergedMap.get(record.getId());
+            if (mergedCount != null) {
+                record.setViewCount(mergedCount);
+            }
+        }
+    }
+
     private boolean isOfficialQuestion(Question question) {
         return question != null && !QuestionAccessSupport.SOURCE_CUSTOM.equalsIgnoreCase(safe(question.getSourceType()));
     }
@@ -506,5 +605,12 @@ public class QuestionApplicationService {
 
     private long elapsedMs(long startNs) {
         return (System.nanoTime() - startNs) / 1_000_000L;
+    }
+
+    private int normalizeHotLimit(Integer limit) {
+        if (limit == null || limit <= 0) {
+            return DEFAULT_HOT_LIMIT;
+        }
+        return Math.min(limit, MAX_HOT_LIMIT);
     }
 }

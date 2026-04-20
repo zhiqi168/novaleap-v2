@@ -3,6 +3,7 @@ package com.novaleap.api.module.question.support;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.fasterxml.jackson.databind.JavaType;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.novaleap.api.module.content.support.ContentViewStatsSupport;
 import com.novaleap.api.module.question.vo.QuestionAnswerVO;
 import com.novaleap.api.module.question.vo.QuestionCategoryOptionVO;
 import com.novaleap.api.module.question.vo.QuestionDetailVO;
@@ -44,13 +45,21 @@ public class QuestionReadCacheSupport {
     private static final String OFFICIAL_DETAIL_LOCK_PREFIX = "nova:lock:question:detail:official:";
     private static final String OFFICIAL_ANSWER_LOCK_PREFIX = "nova:lock:question:answer:official:";
     private static final String VIEW_PENDING_KEY = "nova:question:view:pending";
+    private static final String VIEW_TOTAL_PREFIX = "nova:question:view:total:";
+    private static final String HOT_RANK_KEY = "nova:question:hot:zset";
 
     private final StringRedisTemplate redisTemplate;
     private final ObjectMapper objectMapper;
+    private final ContentViewStatsSupport contentViewStatsSupport;
 
-    public QuestionReadCacheSupport(StringRedisTemplate redisTemplate, ObjectMapper objectMapper) {
+    public QuestionReadCacheSupport(
+            StringRedisTemplate redisTemplate,
+            ObjectMapper objectMapper,
+            ContentViewStatsSupport contentViewStatsSupport
+    ) {
         this.redisTemplate = redisTemplate;
         this.objectMapper = objectMapper;
+        this.contentViewStatsSupport = contentViewStatsSupport;
     }
 
     public String officialListKey(Integer page, Integer size, String category, Integer difficulty, String keyword) {
@@ -106,23 +115,6 @@ public class QuestionReadCacheSupport {
         writeValue(OFFICIAL_DETAIL_PREFIX + safe(questionId), value, QUESTION_DETAIL_TTL);
     }
 
-    public void touchOfficialQuestionDetailViewCount(Long questionId, Integer viewCount) {
-        if (questionId == null || viewCount == null) {
-            return;
-        }
-        QuestionDetailVO cached = readOfficialQuestionDetail(questionId);
-        if (cached == null) {
-            return;
-        }
-        cached.setViewCount(viewCount);
-        writeOfficialQuestionDetail(questionId, cached);
-    }
-
-    public Integer readOfficialQuestionViewCount(Long questionId) {
-        QuestionDetailVO cached = readOfficialQuestionDetail(questionId);
-        return cached == null ? null : cached.getViewCount();
-    }
-
     public QuestionAnswerVO readOfficialQuestionAnswer(Long questionId) {
         return readValue(OFFICIAL_ANSWER_PREFIX + safe(questionId), QuestionAnswerVO.class);
     }
@@ -131,56 +123,36 @@ public class QuestionReadCacheSupport {
         writeValue(OFFICIAL_ANSWER_PREFIX + safe(questionId), value, QUESTION_ANSWER_TTL);
     }
 
-    public long incrementPendingViewCount(Long questionId) {
-        if (questionId == null) {
-            return 0L;
-        }
-        try {
-            Long value = redisTemplate.opsForHash().increment(VIEW_PENDING_KEY, safe(questionId), 1L);
-            return value == null ? 0L : value;
-        } catch (Exception ignore) {
-            return 0L;
-        }
+    public int incrementAndGetOfficialQuestionViewCount(Long questionId, int fallbackBaseCount) {
+        return contentViewStatsSupport.incrementAndGet(VIEW_PENDING_KEY, VIEW_TOTAL_PREFIX, HOT_RANK_KEY, questionId, fallbackBaseCount);
+    }
+
+    public int resolveOfficialQuestionViewCount(Long questionId, Integer fallbackBaseCount) {
+        return contentViewStatsSupport.resolveViewCount(VIEW_PENDING_KEY, VIEW_TOTAL_PREFIX, questionId, fallbackBaseCount);
+    }
+
+    public Map<Long, Integer> resolveOfficialQuestionViewCountMap(Map<Long, Integer> fallbackBaseCountMap) {
+        return contentViewStatsSupport.resolveViewCountMap(VIEW_PENDING_KEY, VIEW_TOTAL_PREFIX, fallbackBaseCountMap);
     }
 
     public Map<Long, Long> loadPendingViewCounts(int limit) {
-        if (limit <= 0) {
-            return Collections.emptyMap();
-        }
-        try {
-            Map<Object, Object> raw = redisTemplate.opsForHash().entries(VIEW_PENDING_KEY);
-            if (raw == null || raw.isEmpty()) {
-                return Collections.emptyMap();
-            }
-            Map<Long, Long> result = new LinkedHashMap<>();
-            for (Map.Entry<Object, Object> entry : raw.entrySet()) {
-                Long questionId = parseLong(entry.getKey());
-                Long delta = parseLong(entry.getValue());
-                if (questionId == null || delta == null || delta <= 0) {
-                    continue;
-                }
-                result.put(questionId, delta);
-                if (result.size() >= limit) {
-                    break;
-                }
-            }
-            return result;
-        } catch (Exception ignore) {
-            return Collections.emptyMap();
-        }
+        return contentViewStatsSupport.loadPendingViewCounts(VIEW_PENDING_KEY, limit);
     }
 
     public void acknowledgePendingViewCount(Long questionId, long flushedDelta) {
-        if (questionId == null || flushedDelta <= 0) {
-            return;
-        }
-        try {
-            Long remaining = redisTemplate.opsForHash().increment(VIEW_PENDING_KEY, safe(questionId), -flushedDelta);
-            if (remaining == null || remaining <= 0L) {
-                redisTemplate.opsForHash().delete(VIEW_PENDING_KEY, safe(questionId));
-            }
-        } catch (Exception ignore) {
-        }
+        contentViewStatsSupport.acknowledgePendingViewCount(VIEW_PENDING_KEY, questionId, flushedDelta);
+    }
+
+    public void resetOfficialQuestionViewCount(Long questionId, Integer latestDbValue) {
+        contentViewStatsSupport.resetTotalViewCount(VIEW_TOTAL_PREFIX, questionId, latestDbValue == null ? 0 : latestDbValue);
+    }
+
+    public void evictOfficialQuestionViewCount(Long questionId) {
+        contentViewStatsSupport.evictTotalViewCount(VIEW_TOTAL_PREFIX, questionId);
+    }
+
+    public List<Long> readHotQuestionIds(int limit) {
+        return contentViewStatsSupport.readTopHotIds(HOT_RANK_KEY, limit);
     }
 
     public String tryLockOfficialQuestionDetail(Long questionId) {

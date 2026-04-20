@@ -593,12 +593,19 @@ import { computed, nextTick, onMounted, onUnmounted, reactive, ref, watch } from
 import confetti from 'canvas-confetti'
 import TypeWriter from '@/components/common/TypeWriter.vue'
 import LoadingDots from '@/components/common/LoadingDots.vue'
-import { useAutoPageRefresh } from '@/composables/useAutoPageRefresh'
 import { useSSE } from '@/composables/useSSE'
 import { api } from '@/composables/useRequest'
 import { useAuthStore } from '@/stores/auth'
+import { useResourceCacheStore } from '@/stores/resourceCache'
 
 const authStore = useAuthStore()
+const resourceCacheStore = useResourceCacheStore()
+const QUESTION_RUNTIME_NAMESPACE = 'question-bank'
+const QUESTION_META_NAMESPACE = 'question-bank-meta'
+const QUESTION_LIST_CACHE_TTL = 2 * 60 * 1000
+const QUESTION_DETAIL_CACHE_TTL = 10 * 60 * 1000
+const QUESTION_CATEGORY_CACHE_TTL = 30 * 60 * 1000
+const QUESTION_BANK_CACHE_TTL = 60 * 1000
 const {
   content: aiContent,
   isStreaming: aiStreaming,
@@ -662,6 +669,43 @@ const bankPanelCollapsed = ref(true)
 
 const customBanks = ref([])
 const currentBankId = ref(null)
+
+const buildQuestionListCacheKey = (page = currentPage.value) => JSON.stringify({
+  page: Number(page || 1),
+  size: 10,
+  category: currentCategory.value,
+  difficulty: difficultyFilter.value,
+  keyword: searchQuery.value.trim(),
+  bankId: currentBankId.value || 0,
+})
+
+const buildQuestionListSnapshot = (page = currentPage.value) => ({
+  records: questions.value.map((item) => ({ ...item })),
+  currentPage: Number(page || currentPage.value || 1),
+  totalPages: Number(totalPages.value || 1),
+  totalQuestions: Number(totalQuestions.value || 0),
+})
+
+const applyQuestionListSnapshot = (snapshot) => {
+  questions.value = Array.isArray(snapshot?.records) ? snapshot.records.map((item) => ({ ...item })) : []
+  currentPage.value = Number(snapshot?.currentPage || 1)
+  totalPages.value = Math.max(1, Number(snapshot?.totalPages || 1))
+  totalQuestions.value = Math.max(0, Number(snapshot?.totalQuestions || 0))
+}
+
+const persistQuestionListSnapshot = (page = currentPage.value) => {
+  resourceCacheStore.writeList(
+    QUESTION_RUNTIME_NAMESPACE,
+    buildQuestionListCacheKey(page),
+    buildQuestionListSnapshot(page),
+  )
+}
+
+const persistQuestionDetailSnapshot = (question = activeQuestion.value) => {
+  const qid = Number(question?.id || 0)
+  if (!qid) return
+  resourceCacheStore.writeDetail(QUESTION_RUNTIME_NAMESPACE, qid, { ...question })
+}
 
 const uploadDialogVisible = ref(false)
 const uploadingBank = ref(false)
@@ -909,6 +953,7 @@ const patchListQuestionViewCount = (questionId, computeNext) => {
       viewCount: safeNext,
     }
   })
+  persistQuestionListSnapshot()
 }
 
 const bumpLocalQuestionViewCount = (questionId) => {
@@ -922,6 +967,7 @@ const bumpLocalQuestionViewCount = (questionId) => {
       ...activeQuestion.value,
       viewCount: nextViews,
     }
+    persistQuestionDetailSnapshot(activeQuestion.value)
   }
 }
 
@@ -937,6 +983,7 @@ const syncQuestionViewCountFromServer = (questionId, viewCount) => {
       ...activeQuestion.value,
       viewCount: Math.max(current, count),
     }
+    persistQuestionDetailSnapshot(activeQuestion.value)
   }
 }
 
@@ -1050,11 +1097,20 @@ const handleBankWheel = (event) => {
   updateBankNavState()
 }
 
-const fetchCategoryOptions = async () => {
+const fetchCategoryOptions = async ({ force = false } = {}) => {
+  if (!force) {
+    const cached = resourceCacheStore.readList(QUESTION_META_NAMESPACE, 'categories', QUESTION_CATEGORY_CACHE_TTL)
+    if (Array.isArray(cached) && cached.length > 0) {
+      applyCategoryOptions(cached)
+      syncCategorySelectionAfterOptionsLoaded()
+      return
+    }
+  }
   try {
     const res = await api.get('/api/questions/categories')
     if (res.code === 200 && Array.isArray(res.data) && res.data.length > 0) {
       applyCategoryOptions(res.data)
+      resourceCacheStore.writeList(QUESTION_META_NAMESPACE, 'categories', res.data)
       syncCategorySelectionAfterOptionsLoaded()
       return
     }
@@ -1063,14 +1119,25 @@ const fetchCategoryOptions = async () => {
   }
 
   applyCategoryOptions(fallbackCategoryOptions)
+  resourceCacheStore.writeList(QUESTION_META_NAMESPACE, 'categories', fallbackCategoryOptions)
   syncCategorySelectionAfterOptionsLoaded()
 }
 
-const fetchCustomBanks = async () => {
+const fetchCustomBanks = async ({ force = false } = {}) => {
   if (authStore.isGuest) {
     customBanks.value = []
     currentBankId.value = null
     return
+  }
+  if (!force) {
+    const cached = resourceCacheStore.readList(QUESTION_META_NAMESPACE, 'custom-banks', QUESTION_BANK_CACHE_TTL)
+    if (Array.isArray(cached)) {
+      customBanks.value = cached
+      if (currentBankId.value && !customBanks.value.some((item) => item.id === currentBankId.value)) {
+        currentBankId.value = null
+      }
+      return
+    }
   }
   try {
     const res = await api.get('/api/question-banks/mine?page=1&size=50')
@@ -1079,6 +1146,7 @@ const fetchCustomBanks = async () => {
         ...bank,
         category: normalizeCategoryCode(bank?.category),
       }))
+      resourceCacheStore.writeList(QUESTION_META_NAMESPACE, 'custom-banks', customBanks.value)
       if (currentBankId.value && !customBanks.value.some((item) => item.id === currentBankId.value)) {
         currentBankId.value = null
       }
@@ -1090,7 +1158,8 @@ const fetchCustomBanks = async () => {
   customBanks.value = []
 }
 
-const fetchQuestions = async (page = currentPage.value) => {
+const fetchQuestions = async (page = currentPage.value, options = {}) => {
+  const { force = false } = options
   if (currentBank.value && !isApprovedBank(currentBank.value)) {
     questions.value = []
     currentPage.value = 1
@@ -1100,34 +1169,48 @@ const fetchQuestions = async (page = currentPage.value) => {
     return
   }
 
-  loading.value = true
-  try {
-    const params = new URLSearchParams()
-    params.set('page', String(page))
-    params.set('size', '10')
-    if (currentCategory.value !== 'all') params.set('category', currentCategory.value)
-    if (difficultyFilter.value !== 'all') params.set('difficulty', difficultyFilter.value)
-    if (searchQuery.value.trim()) params.set('keyword', searchQuery.value.trim())
-    if (currentBankId.value) params.set('bankId', String(currentBankId.value))
-
-    const res = await api.get(`/api/questions?${params.toString()}`)
-    if (res.code !== 200) {
-      questions.value = []
-      totalPages.value = 1
-      totalQuestions.value = 0
-      activeQuestion.value = null
-      clearAnswerPanels()
+  const cacheKey = buildQuestionListCacheKey(page)
+  if (!force) {
+    const cachedSnapshot = resourceCacheStore.readList(QUESTION_RUNTIME_NAMESPACE, cacheKey, QUESTION_LIST_CACHE_TTL)
+    if (cachedSnapshot) {
+      applyQuestionListSnapshot(cachedSnapshot)
+      syncActiveQuestionAfterListLoaded()
       return
     }
+  }
 
-    questions.value = (res.data?.records || []).map((q) => ({
-      ...q,
-      category: normalizeCategoryCode(q?.category),
-      tags: typeof q.tags === 'string' ? q.tags.split(',').map((t) => t.trim()).filter(Boolean) : [],
-    })).map(applyQuestionViewFloor)
-    currentPage.value = page
-    totalPages.value = Math.max(1, Number(res.data?.pages || 1))
-    totalQuestions.value = Math.max(0, Number(res.data?.total || 0))
+  loading.value = true
+  try {
+    const snapshot = await resourceCacheStore.loadList(
+      QUESTION_RUNTIME_NAMESPACE,
+      cacheKey,
+      async () => {
+        const params = new URLSearchParams()
+        params.set('page', String(page))
+        params.set('size', '10')
+        if (currentCategory.value !== 'all') params.set('category', currentCategory.value)
+        if (difficultyFilter.value !== 'all') params.set('difficulty', difficultyFilter.value)
+        if (searchQuery.value.trim()) params.set('keyword', searchQuery.value.trim())
+        if (currentBankId.value) params.set('bankId', String(currentBankId.value))
+
+        const res = await api.get(`/api/questions?${params.toString()}`)
+        if (res.code !== 200) {
+          throw new Error(res.msg || '加载题库失败')
+        }
+        return {
+          records: (res.data?.records || []).map((q) => ({
+            ...q,
+            category: normalizeCategoryCode(q?.category),
+            tags: typeof q.tags === 'string' ? q.tags.split(',').map((t) => t.trim()).filter(Boolean) : [],
+          })).map(applyQuestionViewFloor),
+          currentPage: Number(page || 1),
+          totalPages: Math.max(1, Number(res.data?.pages || 1)),
+          totalQuestions: Math.max(0, Number(res.data?.total || 0)),
+        }
+      },
+      { ttlMs: QUESTION_LIST_CACHE_TTL, force },
+    )
+    applyQuestionListSnapshot(snapshot)
     syncActiveQuestionAfterListLoaded()
   } catch (_) {
     questions.value = []
@@ -1170,30 +1253,58 @@ const hydrateQuestionDetail = async (questionId, fallbackQuestion = null) => {
     activeQuestion.value = fallbackQuestion || null
     return
   }
+  const cachedDetail = resourceCacheStore.readDetail(QUESTION_RUNTIME_NAMESPACE, qid, QUESTION_DETAIL_CACHE_TTL)
+  if (cachedDetail) {
+    const latestListQuestion = questions.value.find((item) => Number(item?.id || 0) === qid)
+    const mergedViewCount = Math.max(
+      Number(cachedDetail.viewCount || 0),
+      Number(latestListQuestion?.viewCount || 0),
+      Number(fallbackQuestion?.viewCount || 0),
+      Number(activeQuestion.value?.id || 0) === qid ? Number(activeQuestion.value?.viewCount || 0) : 0,
+    )
+    activeQuestion.value = applyQuestionViewFloor({
+      ...cachedDetail,
+      viewCount: Number.isFinite(mergedViewCount) ? mergedViewCount : Number(cachedDetail.viewCount || 0),
+    })
+    rememberQuestionViewCount(qid, activeQuestion.value.viewCount)
+    return
+  }
   try {
-    const res = await api.get(`/api/questions/${qid}`)
-    if (res.code === 200 && res.data) {
-      const latestListQuestion = questions.value.find((item) => Number(item?.id || 0) === qid)
-      const mergedViewCount = Math.max(
-        Number(res.data.viewCount || 0),
-        Number(latestListQuestion?.viewCount || 0),
-        Number(fallbackQuestion?.viewCount || 0),
-        Number(activeQuestion.value?.id || 0) === qid ? Number(activeQuestion.value?.viewCount || 0) : 0,
-      )
-      activeQuestion.value = {
-        ...res.data,
-        tags: typeof res.data.tags === 'string' ? res.data.tags.split(',').map((t) => t.trim()).filter(Boolean) : [],
-        viewCount: Number.isFinite(mergedViewCount) ? mergedViewCount : Number(res.data.viewCount || 0),
-      }
-      activeQuestion.value = applyQuestionViewFloor(activeQuestion.value)
-      rememberQuestionViewCount(qid, activeQuestion.value.viewCount)
-      return
-    }
+    const detail = await resourceCacheStore.loadDetail(
+      QUESTION_RUNTIME_NAMESPACE,
+      qid,
+      async () => {
+        const res = await api.get(`/api/questions/${qid}`)
+        if (res.code !== 200 || !res.data) {
+          throw new Error(res.msg || '加载题目详情失败')
+        }
+        return {
+          ...res.data,
+          tags: typeof res.data.tags === 'string' ? res.data.tags.split(',').map((t) => t.trim()).filter(Boolean) : [],
+        }
+      },
+      { ttlMs: QUESTION_DETAIL_CACHE_TTL },
+    )
+    const latestListQuestion = questions.value.find((item) => Number(item?.id || 0) === qid)
+    const mergedViewCount = Math.max(
+      Number(detail.viewCount || 0),
+      Number(latestListQuestion?.viewCount || 0),
+      Number(fallbackQuestion?.viewCount || 0),
+      Number(activeQuestion.value?.id || 0) === qid ? Number(activeQuestion.value?.viewCount || 0) : 0,
+    )
+    activeQuestion.value = applyQuestionViewFloor({
+      ...detail,
+      viewCount: Number.isFinite(mergedViewCount) ? mergedViewCount : Number(detail.viewCount || 0),
+    })
+    rememberQuestionViewCount(qid, activeQuestion.value.viewCount)
+    persistQuestionDetailSnapshot(activeQuestion.value)
+    return
   } catch (_) {
     // fall back to list payload
   }
   const latestListQuestion = questions.value.find((item) => Number(item?.id || 0) === qid)
   activeQuestion.value = applyQuestionViewFloor(latestListQuestion || fallbackQuestion || null)
+  persistQuestionDetailSnapshot(activeQuestion.value)
 }
 
 const syncActiveQuestionAfterListLoaded = () => {
@@ -1213,11 +1324,13 @@ const syncActiveQuestionAfterListLoaded = () => {
       category: matched.category,
       tags: matched.tags,
     }
+    persistQuestionDetailSnapshot(activeQuestion.value)
     return
   }
 
   const firstQuestion = questions.value[0]
   activeQuestion.value = firstQuestion
+  persistQuestionDetailSnapshot(activeQuestion.value)
   clearAnswerPanels()
   const firstQuestionId = Number(firstQuestion?.id || 0)
   if (firstQuestionId > 0) {
@@ -1230,8 +1343,9 @@ const openQuestion = async (question) => {
   const qid = Number(question?.id || 0)
   const isSameQuestion = qid > 0 && Number(activeQuestion.value?.id || 0) === qid
   if (isSameQuestion) {
-    // Align with Notes module: clicking the already selected item does not increase view count.
-    await hydrateQuestionDetail(qid, question)
+    if (!activeQuestion.value?.content) {
+      await hydrateQuestionDetail(qid, question)
+    }
     if (!dbAnswer.value && !dbAnswerLoading.value) {
       loadDbAnswer(qid, { preserveExisting: true })
     }
@@ -1248,7 +1362,7 @@ const openQuestion = async (question) => {
     return
   }
 
-    clearAnswerPanels()
+  clearAnswerPanels()
   await hydrateQuestionDetail(qid, question)
   void markQuestionViewed(qid)
   if (window.innerWidth < 768) {
@@ -1508,11 +1622,13 @@ const submitImport = async () => {
     }
 
     closeImportDialog()
-    await fetchCustomBanks()
+    resourceCacheStore.invalidateLists(QUESTION_META_NAMESPACE)
+    resourceCacheStore.invalidateLists(QUESTION_RUNTIME_NAMESPACE)
+    await fetchCustomBanks({ force: true })
     if (res.data?.id) {
       currentBankId.value = res.data.id
     }
-    await fetchQuestions(1)
+    await fetchQuestions(1, { force: true })
     alert('题库已提交审核，审核通过后会自动入库。')
   } catch (e) {
     const message = String(e?.message || '')
@@ -1574,7 +1690,8 @@ const submitRename = async () => {
       throw new Error(res.msg || '重命名失败')
     }
     closeRenameDialog()
-    await fetchCustomBanks()
+    resourceCacheStore.invalidateLists(QUESTION_META_NAMESPACE)
+    await fetchCustomBanks({ force: true })
   } catch (e) {
     alert(e.message || '重命名失败')
   } finally {
@@ -1612,10 +1729,6 @@ const refreshQuestionBankData = async () => {
   syncCategoryToSelectedBank()
   await fetchQuestions(currentPage.value || 1)
 }
-
-useAutoPageRefresh(refreshQuestionBankData, {
-  throttleMs: 15000,
-})
 
 onMounted(async () => {
   await refreshQuestionBankData()

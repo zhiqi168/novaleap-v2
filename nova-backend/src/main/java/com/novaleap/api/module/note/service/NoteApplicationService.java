@@ -44,6 +44,8 @@ public class NoteApplicationService {
 
     private static final int NOTE_STATUS_PENDING = 0;
     private static final int NOTE_STATUS_APPROVED = 1;
+    private static final int DEFAULT_HOT_LIMIT = 10;
+    private static final int MAX_HOT_LIMIT = 20;
     private static final int HOT_KEY_RETRY_TIMES = 3;
     private static final long HOT_KEY_RETRY_SLEEP_MS = 40L;
     private static final Logger log = LoggerFactory.getLogger(NoteApplicationService.class);
@@ -92,6 +94,7 @@ public class NoteApplicationService {
         String cacheKey = noteReadCacheSupport.publicListKey(page, size, keyword, category);
         Page<NoteListItemVO> cached = noteReadCacheSupport.readNoteListPage(cacheKey);
         if (cached != null) {
+            applyResolvedNoteListViewCounts(cached.getRecords());
             hydrateLikedState(cached.getRecords(), actor);
             log.info("[perf][note-list] cache-hit scope=public page={} size={} keyword={} category={} records={} total={} tookMs={}",
                     normalizePage(page), normalizeSize(size), safe(keyword), safe(category),
@@ -101,7 +104,21 @@ public class NoteApplicationService {
 
         Page<Note> pageParam = new Page<>(page == null ? 1 : page, size == null ? 10 : size);
         LambdaQueryWrapper<Note> wrapper = new LambdaQueryWrapper<>();
-        wrapper.eq(Note::getStatus, NOTE_STATUS_APPROVED);
+        wrapper.select(
+                        Note::getId,
+                        Note::getTitle,
+                        Note::getSummary,
+                        Note::getCategory,
+                        Note::getEmoji,
+                        Note::getAuthor,
+                        Note::getContent,
+                        Note::getViewCount,
+                        Note::getStatus,
+                        Note::getRejectReason,
+                        Note::getCreatedAt,
+                        Note::getUpdatedAt
+                )
+                .eq(Note::getStatus, NOTE_STATUS_APPROVED);
 
         if (keyword != null && !keyword.isBlank()) {
             wrapper.and(w -> w.like(Note::getTitle, keyword.trim())
@@ -118,6 +135,7 @@ public class NoteApplicationService {
 
         Page<NoteListItemVO> voPage = toNoteListPage(result.getRecords(), result);
         noteReadCacheSupport.writePublicListPage(cacheKey, cloneWithoutLikeState(voPage));
+        applyResolvedNoteListViewCounts(voPage.getRecords());
         log.info("[perf][note-list] cache-miss scope=public page={} size={} keyword={} category={} records={} total={} tookMs={}",
                 normalizePage(page), normalizeSize(size), safe(keyword), safe(category),
                 voPage.getRecords() == null ? 0 : voPage.getRecords().size(), voPage.getTotal(), elapsedMs(startNs));
@@ -130,6 +148,7 @@ public class NoteApplicationService {
         String cacheKey = noteReadCacheSupport.mineListKey(user.getId(), page, size, status);
         Page<NoteListItemVO> cached = noteReadCacheSupport.readNoteListPage(cacheKey);
         if (cached != null) {
+            applyResolvedNoteListViewCounts(cached.getRecords());
             log.info("[perf][note-list] cache-hit scope=mine userId={} page={} size={} status={} records={} total={} tookMs={}",
                     user.getId(), normalizePage(page), normalizeMineSize(size), status,
                     cached.getRecords() == null ? 0 : cached.getRecords().size(), cached.getTotal(), elapsedMs(startNs));
@@ -138,7 +157,22 @@ public class NoteApplicationService {
 
         Page<Note> pageParam = new Page<>(page == null ? 1 : page, size == null ? 20 : size);
         LambdaQueryWrapper<Note> wrapper = new LambdaQueryWrapper<>();
-        wrapper.eq(Note::getUserId, user.getId());
+        wrapper.select(
+                        Note::getId,
+                        Note::getTitle,
+                        Note::getSummary,
+                        Note::getCategory,
+                        Note::getEmoji,
+                        Note::getAuthor,
+                        Note::getContent,
+                        Note::getViewCount,
+                        Note::getStatus,
+                        Note::getRejectReason,
+                        Note::getCreatedAt,
+                        Note::getUpdatedAt,
+                        Note::getUserId
+                )
+                .eq(Note::getUserId, user.getId());
         if (status != null) {
             wrapper.eq(Note::getStatus, status);
         }
@@ -150,6 +184,7 @@ public class NoteApplicationService {
 
         Page<NoteListItemVO> voPage = toNoteListPage(result.getRecords(), result);
         noteReadCacheSupport.writeMineListPage(cacheKey, voPage);
+        applyResolvedNoteListViewCounts(voPage.getRecords());
         log.info("[perf][note-list] cache-miss scope=mine userId={} page={} size={} status={} records={} total={} tookMs={}",
                 user.getId(), normalizePage(page), normalizeMineSize(size), status,
                 voPage.getRecords() == null ? 0 : voPage.getRecords().size(), voPage.getTotal(), elapsedMs(startNs));
@@ -161,6 +196,7 @@ public class NoteApplicationService {
         ActorIdentity actor = currentUserService.resolveActor(authentication);
         NoteDetailVO cached = noteReadCacheSupport.readNoteDetail(id);
         if (cached != null) {
+            cached.setViewCount(noteReadCacheSupport.resolveNoteViewCount(id, cached.getViewCount()));
             hydrateLikedState(cached, actor);
             log.info("[perf][note-detail] cache-hit id={} tookMs={}", id, elapsedMs(startNs));
             return cached;
@@ -170,6 +206,7 @@ public class NoteApplicationService {
         if (lockToken == null) {
             NoteDetailVO waitedCache = waitForNoteDetailCache(id);
             if (waitedCache != null) {
+                waitedCache.setViewCount(noteReadCacheSupport.resolveNoteViewCount(id, waitedCache.getViewCount()));
                 hydrateLikedState(waitedCache, actor);
                 log.info("[perf][note-detail] cache-hit-after-wait id={} tookMs={}", id, elapsedMs(startNs));
                 return waitedCache;
@@ -180,6 +217,7 @@ public class NoteApplicationService {
             if (lockToken != null) {
                 NoteDetailVO doubleChecked = noteReadCacheSupport.readNoteDetail(id);
                 if (doubleChecked != null) {
+                    doubleChecked.setViewCount(noteReadCacheSupport.resolveNoteViewCount(id, doubleChecked.getViewCount()));
                     hydrateLikedState(doubleChecked, actor);
                     log.info("[perf][note-detail] cache-hit-after-lock id={} tookMs={}", id, elapsedMs(startNs));
                     return doubleChecked;
@@ -189,6 +227,7 @@ public class NoteApplicationService {
             Note note = loadAccessibleNote(id, authentication);
             enrichNoteMetadata(note, actor);
             NoteDetailVO detail = NoteViewAssembler.toDetailVO(note);
+            detail.setViewCount(noteReadCacheSupport.resolveNoteViewCount(id, detail.getViewCount()));
             if (Integer.valueOf(NOTE_STATUS_APPROVED).equals(note.getStatus())) {
                 noteReadCacheSupport.writeNoteDetail(id, copyWithoutLikeState(detail));
             }
@@ -205,26 +244,86 @@ public class NoteApplicationService {
         ActorIdentity actor = currentUserService.resolveActor(authentication);
         NoteDetailVO cachedDetail = noteReadCacheSupport.readNoteDetail(id);
         if (cachedDetail != null) {
-            int nextCount = (cachedDetail.getViewCount() == null ? 0 : cachedDetail.getViewCount()) + 1;
-            noteReadCacheSupport.incrementPendingViewCount(id);
-            noteReadCacheSupport.touchNoteDetailViewCount(id, nextCount);
+            int nextCount = noteReadCacheSupport.incrementAndGetNoteViewCount(id, cachedDetail.getViewCount() == null ? 0 : cachedDetail.getViewCount());
             NoteDetailVO response = copyWithoutLikeState(cachedDetail);
             response.setViewCount(nextCount);
+            noteReadCacheSupport.writeNoteDetail(id, response);
             hydrateLikedState(response, actor);
             log.info("[perf][note-view] buffered id={} nextCount={} tookMs={}", id, nextCount, elapsedMs(startNs));
             return response;
         }
 
         Note note = loadAccessibleNote(id, authentication);
-        noteReadCacheSupport.incrementPendingViewCount(id);
-        note.setViewCount((note.getViewCount() == null ? 0 : note.getViewCount()) + 1);
+        note.setViewCount(noteReadCacheSupport.incrementAndGetNoteViewCount(id, note.getViewCount() == null ? 0 : note.getViewCount()));
         enrichNoteMetadata(note, actor);
         if (Integer.valueOf(NOTE_STATUS_APPROVED).equals(note.getStatus())) {
-            noteReadCacheSupport.touchNoteDetailViewCount(id, note.getViewCount());
             noteReadCacheSupport.writeNoteDetail(id, copyWithoutLikeState(NoteViewAssembler.toDetailVO(note)));
         }
         log.info("[perf][note-view] fallback-buffered id={} nextCount={} tookMs={}", id, note.getViewCount(), elapsedMs(startNs));
         return NoteViewAssembler.toDetailVO(note);
+    }
+
+    public List<NoteListItemVO> getHotNoteList(Integer limit, Authentication authentication) {
+        ActorIdentity actor = currentUserService.resolveActor(authentication);
+        int finalLimit = normalizeHotLimit(limit);
+        List<Long> hotIds = noteReadCacheSupport.readHotNoteIds(finalLimit);
+        if (hotIds.isEmpty()) {
+            LambdaQueryWrapper<Note> wrapper = new LambdaQueryWrapper<>();
+            wrapper.select(
+                            Note::getId,
+                            Note::getTitle,
+                            Note::getSummary,
+                            Note::getCategory,
+                            Note::getEmoji,
+                            Note::getAuthor,
+                            Note::getContent,
+                            Note::getViewCount,
+                            Note::getStatus,
+                            Note::getRejectReason,
+                            Note::getCreatedAt,
+                            Note::getUpdatedAt
+                    )
+                    .eq(Note::getStatus, NOTE_STATUS_APPROVED)
+                    .orderByDesc(Note::getViewCount)
+                    .orderByDesc(Note::getCreatedAt)
+                    .last("LIMIT " + finalLimit);
+            List<NoteListItemVO> fallback = questionlessNoteList(wrapper, actor);
+            applyResolvedNoteListViewCounts(fallback);
+            hydrateLikedState(fallback, actor);
+            return fallback;
+        }
+
+        Map<Long, Integer> orderMap = new HashMap<>();
+        for (int i = 0; i < hotIds.size(); i++) {
+            orderMap.put(hotIds.get(i), i);
+        }
+        LambdaQueryWrapper<Note> wrapper = new LambdaQueryWrapper<>();
+        wrapper.select(
+                        Note::getId,
+                        Note::getTitle,
+                        Note::getSummary,
+                        Note::getCategory,
+                        Note::getEmoji,
+                        Note::getAuthor,
+                        Note::getContent,
+                        Note::getViewCount,
+                        Note::getStatus,
+                        Note::getRejectReason,
+                        Note::getCreatedAt,
+                        Note::getUpdatedAt
+                )
+                .eq(Note::getStatus, NOTE_STATUS_APPROVED)
+                .in(Note::getId, hotIds);
+        List<NoteListItemVO> hotList = questionlessNoteList(wrapper, actor).stream()
+                .sorted((left, right) -> Integer.compare(
+                        orderMap.getOrDefault(left.getId(), Integer.MAX_VALUE),
+                        orderMap.getOrDefault(right.getId(), Integer.MAX_VALUE)
+                ))
+                .limit(finalLimit)
+                .toList();
+        applyResolvedNoteListViewCounts(hotList);
+        hydrateLikedState(hotList, actor);
+        return hotList;
     }
 
     @Transactional
@@ -251,6 +350,7 @@ public class NoteApplicationService {
 
         noteMapper.insert(note);
         noteReadCacheSupport.evictMineLists(user.getId());
+        noteReadCacheSupport.resetNoteViewCount(note.getId(), 0);
         return NoteViewAssembler.toDetailVO(note);
     }
 
@@ -370,10 +470,31 @@ public class NoteApplicationService {
         noteMapper.deleteById(id);
         noteReadCacheSupport.evictNoteReadCaches(id);
         noteReadCacheSupport.evictMineLists(user.getId());
+        noteReadCacheSupport.evictNoteViewCount(id);
     }
 
     private Note loadAccessibleNote(Long id, Authentication authentication) {
-        Note note = noteMapper.selectById(id);
+        LambdaQueryWrapper<Note> wrapper = new LambdaQueryWrapper<>();
+        wrapper.select(
+                        Note::getId,
+                        Note::getTitle,
+                        Note::getContent,
+                        Note::getSummary,
+                        Note::getCategory,
+                        Note::getEmoji,
+                        Note::getAuthor,
+                        Note::getUserId,
+                        Note::getViewCount,
+                        Note::getStatus,
+                        Note::getRejectReason,
+                        Note::getAuditSource,
+                        Note::getAuditedAt,
+                        Note::getCreatedAt,
+                        Note::getUpdatedAt
+                )
+                .eq(Note::getId, id)
+                .last("LIMIT 1");
+        Note note = noteMapper.selectOne(wrapper);
         if (note == null) {
             throw new NotFoundException("\u624b\u8bb0\u4e0d\u5b58\u5728");
         }
@@ -489,6 +610,35 @@ public class NoteApplicationService {
             result.put(id, asLongValue(row.get("total")));
         }
         return result;
+    }
+
+    private List<NoteListItemVO> questionlessNoteList(LambdaQueryWrapper<Note> wrapper, ActorIdentity actor) {
+        List<Note> notes = noteMapper.selectList(wrapper);
+        enrichNoteMetadata(notes, actor);
+        return notes.stream().map(NoteViewAssembler::toListItemVO).toList();
+    }
+
+    private void applyResolvedNoteListViewCounts(List<NoteListItemVO> items) {
+        if (items == null || items.isEmpty()) {
+            return;
+        }
+        Map<Long, Integer> fallbackMap = new HashMap<>();
+        for (NoteListItemVO item : items) {
+            if (item == null || item.getId() == null) {
+                continue;
+            }
+            fallbackMap.put(item.getId(), item.getViewCount() == null ? 0 : item.getViewCount());
+        }
+        Map<Long, Integer> mergedMap = noteReadCacheSupport.resolveNoteViewCountMap(fallbackMap);
+        for (NoteListItemVO item : items) {
+            if (item == null || item.getId() == null) {
+                continue;
+            }
+            Integer merged = mergedMap.get(item.getId());
+            if (merged != null) {
+                item.setViewCount(merged);
+            }
+        }
     }
 
     private void hydrateLikedState(List<NoteListItemVO> items, ActorIdentity actor) {
@@ -648,6 +798,13 @@ public class NoteApplicationService {
 
     private int normalizeMineSize(Integer value) {
         return value == null || value < 1 ? 20 : value;
+    }
+
+    private int normalizeHotLimit(Integer value) {
+        if (value == null || value <= 0) {
+            return DEFAULT_HOT_LIMIT;
+        }
+        return Math.min(value, MAX_HOT_LIMIT);
     }
 
     private String safe(String value) {

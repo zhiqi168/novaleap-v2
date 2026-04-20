@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.fasterxml.jackson.databind.JavaType;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.novaleap.api.dto.NoteCommentVO;
+import com.novaleap.api.module.content.support.ContentViewStatsSupport;
 import com.novaleap.api.module.note.vo.NoteDetailVO;
 import com.novaleap.api.module.note.vo.NoteListItemVO;
 import com.novaleap.api.module.system.security.ActorIdentity;
@@ -38,13 +39,21 @@ public class NoteReadCacheSupport {
     private static final String LIKE_STATE_PREFIX = "nova:note:liked:";
     private static final String DETAIL_LOCK_PREFIX = "nova:lock:note:detail:";
     private static final String VIEW_PENDING_KEY = "nova:note:view:pending";
+    private static final String VIEW_TOTAL_PREFIX = "nova:note:view:total:";
+    private static final String HOT_RANK_KEY = "nova:note:hot:zset";
 
     private final StringRedisTemplate redisTemplate;
     private final ObjectMapper objectMapper;
+    private final ContentViewStatsSupport contentViewStatsSupport;
 
-    public NoteReadCacheSupport(StringRedisTemplate redisTemplate, ObjectMapper objectMapper) {
+    public NoteReadCacheSupport(
+            StringRedisTemplate redisTemplate,
+            ObjectMapper objectMapper,
+            ContentViewStatsSupport contentViewStatsSupport
+    ) {
         this.redisTemplate = redisTemplate;
         this.objectMapper = objectMapper;
+        this.contentViewStatsSupport = contentViewStatsSupport;
     }
 
     public String publicListKey(Integer page, Integer size, String keyword, String category) {
@@ -98,23 +107,6 @@ public class NoteReadCacheSupport {
 
     public void writeNoteDetail(Long noteId, NoteDetailVO value) {
         writeValue(detailKey(noteId), value, DETAIL_TTL);
-    }
-
-    public void touchNoteDetailViewCount(Long noteId, Integer viewCount) {
-        if (noteId == null || viewCount == null) {
-            return;
-        }
-        NoteDetailVO cached = readNoteDetail(noteId);
-        if (cached == null) {
-            return;
-        }
-        cached.setViewCount(viewCount);
-        writeNoteDetail(noteId, cached);
-    }
-
-    public Integer readNoteViewCount(Long noteId) {
-        NoteDetailVO cached = readNoteDetail(noteId);
-        return cached == null ? null : cached.getViewCount();
     }
 
     public List<NoteCommentVO> readComments(Long noteId) {
@@ -187,56 +179,36 @@ public class NoteReadCacheSupport {
         }
     }
 
-    public long incrementPendingViewCount(Long noteId) {
-        if (noteId == null) {
-            return 0L;
-        }
-        try {
-            Long value = redisTemplate.opsForHash().increment(VIEW_PENDING_KEY, safe(noteId), 1L);
-            return value == null ? 0L : value;
-        } catch (Exception ignore) {
-            return 0L;
-        }
+    public int incrementAndGetNoteViewCount(Long noteId, int fallbackBaseCount) {
+        return contentViewStatsSupport.incrementAndGet(VIEW_PENDING_KEY, VIEW_TOTAL_PREFIX, HOT_RANK_KEY, noteId, fallbackBaseCount);
+    }
+
+    public int resolveNoteViewCount(Long noteId, Integer fallbackBaseCount) {
+        return contentViewStatsSupport.resolveViewCount(VIEW_PENDING_KEY, VIEW_TOTAL_PREFIX, noteId, fallbackBaseCount);
+    }
+
+    public Map<Long, Integer> resolveNoteViewCountMap(Map<Long, Integer> fallbackBaseCountMap) {
+        return contentViewStatsSupport.resolveViewCountMap(VIEW_PENDING_KEY, VIEW_TOTAL_PREFIX, fallbackBaseCountMap);
     }
 
     public Map<Long, Long> loadPendingViewCounts(int limit) {
-        if (limit <= 0) {
-            return Collections.emptyMap();
-        }
-        try {
-            Map<Object, Object> raw = redisTemplate.opsForHash().entries(VIEW_PENDING_KEY);
-            if (raw == null || raw.isEmpty()) {
-                return Collections.emptyMap();
-            }
-            Map<Long, Long> result = new LinkedHashMap<>();
-            for (Map.Entry<Object, Object> entry : raw.entrySet()) {
-                Long noteId = parseLong(entry.getKey());
-                Long delta = parseLong(entry.getValue());
-                if (noteId == null || delta == null || delta <= 0) {
-                    continue;
-                }
-                result.put(noteId, delta);
-                if (result.size() >= limit) {
-                    break;
-                }
-            }
-            return result;
-        } catch (Exception ignore) {
-            return Collections.emptyMap();
-        }
+        return contentViewStatsSupport.loadPendingViewCounts(VIEW_PENDING_KEY, limit);
     }
 
     public void acknowledgePendingViewCount(Long noteId, long flushedDelta) {
-        if (noteId == null || flushedDelta <= 0) {
-            return;
-        }
-        try {
-            Long remaining = redisTemplate.opsForHash().increment(VIEW_PENDING_KEY, safe(noteId), -flushedDelta);
-            if (remaining == null || remaining <= 0L) {
-                redisTemplate.opsForHash().delete(VIEW_PENDING_KEY, safe(noteId));
-            }
-        } catch (Exception ignore) {
-        }
+        contentViewStatsSupport.acknowledgePendingViewCount(VIEW_PENDING_KEY, noteId, flushedDelta);
+    }
+
+    public void resetNoteViewCount(Long noteId, Integer latestDbValue) {
+        contentViewStatsSupport.resetTotalViewCount(VIEW_TOTAL_PREFIX, noteId, latestDbValue == null ? 0 : latestDbValue);
+    }
+
+    public void evictNoteViewCount(Long noteId) {
+        contentViewStatsSupport.evictTotalViewCount(VIEW_TOTAL_PREFIX, noteId);
+    }
+
+    public List<Long> readHotNoteIds(int limit) {
+        return contentViewStatsSupport.readTopHotIds(HOT_RANK_KEY, limit);
     }
 
     public String tryLockNoteDetail(Long noteId) {

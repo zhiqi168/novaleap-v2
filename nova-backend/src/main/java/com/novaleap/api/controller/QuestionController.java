@@ -72,4 +72,12 @@ public class QuestionController {
     public Result<QuestionAnswerVO> getQuestionAnswer(@PathVariable(value = "id") Long id, Authentication authentication) {
         return Result.success(questionApplicationService.getQuestionAnswer(id, authentication));
     }
+
+    @GetMapping("/hot")
+    public Result<List<QuestionListItemVO>> getHotQuestionList(
+            @RequestParam(value = "limit", defaultValue = "10") Integer limit,
+            Authentication authentication
+    ) {
+        return Result.success(questionApplicationService.getHotQuestionList(limit, authentication));
+    }
 }
