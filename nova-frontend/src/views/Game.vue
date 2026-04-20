@@ -1314,18 +1314,64 @@ const onKeyDown = (e) => {
 }
 
 const onPointerDown = (e) => {
+  if (e.pointerId != null) {
+    try {
+      gameCanvas.value?.setPointerCapture?.(e.pointerId)
+    } catch (_) {
+      // ignore capture failures on unsupported browsers
+    }
+  }
   pointerStart = { x: e.clientX, y: e.clientY, t: performance.now() }
 }
 
-const onPointerUp = (e) => {
+const finishPointerGesture = (x, y) => {
   if (!pointerStart) return
-  const dx = e.clientX - pointerStart.x
-  const dy = e.clientY - pointerStart.y
+  const dx = x - pointerStart.x
+  const dy = y - pointerStart.y
   const dt = performance.now() - pointerStart.t
   pointerStart = null
   const threshold = isMobile.value ? 22 : 30
   if (Math.abs(dx) > Math.abs(dy) && Math.abs(dx) > threshold) return moveLane(dx > 0 ? 1 : -1)
   if (dt < 260 && Math.abs(dx) < 20 && Math.abs(dy) < 20 && gameState.value !== 'playing') handlePrimaryAction()
+}
+
+const onPointerUp = (e) => {
+  if (e.pointerId != null) {
+    try {
+      gameCanvas.value?.releasePointerCapture?.(e.pointerId)
+    } catch (_) {
+      // ignore capture failures on unsupported browsers
+    }
+  }
+  finishPointerGesture(e.clientX, e.clientY)
+}
+
+const onPointerCancel = () => {
+  pointerStart = null
+}
+
+const onTouchStart = (e) => {
+  const touch = e.changedTouches?.[0] || e.touches?.[0]
+  if (!touch) return
+  pointerStart = { x: touch.clientX, y: touch.clientY, t: performance.now() }
+}
+
+const onTouchMove = (e) => {
+  if (!pointerStart) return
+  e.preventDefault()
+}
+
+const onTouchEnd = (e) => {
+  const touch = e.changedTouches?.[0]
+  if (!touch) {
+    pointerStart = null
+    return
+  }
+  finishPointerGesture(touch.clientX, touch.clientY)
+}
+
+const onTouchCancel = () => {
+  pointerStart = null
 }
 
 const resizeCanvas = () => {
@@ -1351,6 +1397,11 @@ const bindGameEvents = () => {
   window.addEventListener('keydown', onKeyDown)
   gameCanvas.value?.addEventListener('pointerdown', onPointerDown)
   gameCanvas.value?.addEventListener('pointerup', onPointerUp)
+  gameCanvas.value?.addEventListener('pointercancel', onPointerCancel)
+  gameCanvas.value?.addEventListener('touchstart', onTouchStart, { passive: false })
+  gameCanvas.value?.addEventListener('touchmove', onTouchMove, { passive: false })
+  gameCanvas.value?.addEventListener('touchend', onTouchEnd, { passive: false })
+  gameCanvas.value?.addEventListener('touchcancel', onTouchCancel, { passive: false })
 }
 
 const unbindGameEvents = () => {
@@ -1359,6 +1410,11 @@ const unbindGameEvents = () => {
   window.removeEventListener('keydown', onKeyDown)
   gameCanvas.value?.removeEventListener('pointerdown', onPointerDown)
   gameCanvas.value?.removeEventListener('pointerup', onPointerUp)
+  gameCanvas.value?.removeEventListener('pointercancel', onPointerCancel)
+  gameCanvas.value?.removeEventListener('touchstart', onTouchStart)
+  gameCanvas.value?.removeEventListener('touchmove', onTouchMove)
+  gameCanvas.value?.removeEventListener('touchend', onTouchEnd)
+  gameCanvas.value?.removeEventListener('touchcancel', onTouchCancel)
 }
 
 const setupGameCanvas = async () => {

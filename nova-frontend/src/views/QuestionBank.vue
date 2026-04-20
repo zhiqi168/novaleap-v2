@@ -648,10 +648,12 @@ const totalQuestions = ref(0)
 const activeQuestion = ref(null)
 const aiStarted = ref(false)
 const doneQuestionIds = ref(new Set())
+const pendingDoneQuestionIds = ref(new Set())
 const doneTip = ref('')
 const doneConfirmVisible = ref(false)
 const doneConfirmLoading = ref(false)
 const pendingDoneQuestionId = ref(null)
+const questionViewFloorMap = ref(new Map())
 
 const dbAnswer = ref('')
 const dbAnswerSource = ref('')
@@ -718,7 +720,8 @@ const categoryLabel = (category) => {
   return categories.value.find((c) => c.id === code)?.name || code
 }
 const difficultyLabel = (level) => ({ 1: '简单', 2: '中等', 3: '困难' }[Number(level)] || '未知')
-const isDoneQuestion = (id) => doneQuestionIds.value.has(Number(id))
+const isQuestionDonePending = (id) => pendingDoneQuestionIds.value.has(Number(id))
+const isDoneQuestion = (id) => isQuestionDonePending(id) || doneQuestionIds.value.has(Number(id))
 const isApprovedBank = (bank) => Number(bank?.status) === 1
 const bankQuestionCount = (bank) => Number(bank?.importedQuestionCount || bank?.questionCount || 0)
 const bankStatusText = (status) => {
@@ -855,6 +858,43 @@ const clearAnswerPanels = () => {
   resetAi()
 }
 
+const readQuestionViewFloor = (questionId) => {
+  const qid = Number(questionId)
+  if (!Number.isInteger(qid) || qid <= 0) return null
+  return questionViewFloorMap.value.get(qid) ?? null
+}
+
+const rememberQuestionViewCount = (questionId, viewCount) => {
+  const qid = Number(questionId)
+  const nextCount = Number(viewCount)
+  if (!Number.isInteger(qid) || qid <= 0 || !Number.isFinite(nextCount)) return
+  const nextMap = new Map(questionViewFloorMap.value)
+  nextMap.set(qid, Math.max(0, nextCount))
+  questionViewFloorMap.value = nextMap
+}
+
+const applyQuestionViewFloor = (question) => {
+  if (!question?.id) return question
+  const localFloor = readQuestionViewFloor(question.id)
+  if (localFloor == null) return question
+  return {
+    ...question,
+    viewCount: Math.max(Number(question.viewCount || 0), localFloor),
+  }
+}
+
+const updateDoneQuestionSet = (updater) => {
+  const next = new Set(doneQuestionIds.value)
+  updater(next)
+  doneQuestionIds.value = next
+}
+
+const updatePendingDoneQuestionSet = (updater) => {
+  const next = new Set(pendingDoneQuestionIds.value)
+  updater(next)
+  pendingDoneQuestionIds.value = next
+}
+
 const patchListQuestionViewCount = (questionId, computeNext) => {
   const qid = Number(questionId)
   if (!Number.isInteger(qid) || qid <= 0) return
@@ -862,9 +902,11 @@ const patchListQuestionViewCount = (questionId, computeNext) => {
     if (Number(item?.id) !== qid) return item
     const current = Number(item?.viewCount || 0)
     const next = Number(computeNext(current))
+    const safeNext = Number.isFinite(next) ? Math.max(0, next) : current
+    rememberQuestionViewCount(qid, safeNext)
     return {
       ...item,
-      viewCount: Number.isFinite(next) ? Math.max(0, next) : current,
+      viewCount: safeNext,
     }
   })
 }
@@ -874,9 +916,11 @@ const bumpLocalQuestionViewCount = (questionId) => {
   if (!Number.isInteger(qid) || qid <= 0) return
   patchListQuestionViewCount(qid, (current) => current + 1)
   if (Number(activeQuestion.value?.id) === qid) {
+    const nextViews = Number(activeQuestion.value?.viewCount || 0) + 1
+    rememberQuestionViewCount(qid, nextViews)
     activeQuestion.value = {
       ...activeQuestion.value,
-      viewCount: Number(activeQuestion.value?.viewCount || 0) + 1,
+      viewCount: nextViews,
     }
   }
 }
@@ -885,6 +929,7 @@ const syncQuestionViewCountFromServer = (questionId, viewCount) => {
   const qid = Number(questionId)
   const count = Number(viewCount)
   if (!Number.isInteger(qid) || qid <= 0 || !Number.isFinite(count)) return
+  rememberQuestionViewCount(qid, count)
   patchListQuestionViewCount(qid, (current) => Math.max(current, count))
   if (Number(activeQuestion.value?.id) === qid) {
     const current = Number(activeQuestion.value?.viewCount || 0)
@@ -1079,7 +1124,7 @@ const fetchQuestions = async (page = currentPage.value) => {
       ...q,
       category: normalizeCategoryCode(q?.category),
       tags: typeof q.tags === 'string' ? q.tags.split(',').map((t) => t.trim()).filter(Boolean) : [],
-    }))
+    })).map(applyQuestionViewFloor)
     currentPage.value = page
     totalPages.value = Math.max(1, Number(res.data?.pages || 1))
     totalQuestions.value = Math.max(0, Number(res.data?.total || 0))
@@ -1140,13 +1185,15 @@ const hydrateQuestionDetail = async (questionId, fallbackQuestion = null) => {
         tags: typeof res.data.tags === 'string' ? res.data.tags.split(',').map((t) => t.trim()).filter(Boolean) : [],
         viewCount: Number.isFinite(mergedViewCount) ? mergedViewCount : Number(res.data.viewCount || 0),
       }
+      activeQuestion.value = applyQuestionViewFloor(activeQuestion.value)
+      rememberQuestionViewCount(qid, activeQuestion.value.viewCount)
       return
     }
   } catch (_) {
     // fall back to list payload
   }
   const latestListQuestion = questions.value.find((item) => Number(item?.id || 0) === qid)
-  activeQuestion.value = latestListQuestion || fallbackQuestion || null
+  activeQuestion.value = applyQuestionViewFloor(latestListQuestion || fallbackQuestion || null)
 }
 
 const syncActiveQuestionAfterListLoaded = () => {
@@ -1277,6 +1324,7 @@ const drawRandomQuestion = async () => {
 const loadDoneFromServer = async () => {
   if (authStore.isGuest) {
     doneQuestionIds.value = new Set()
+    pendingDoneQuestionIds.value = new Set()
     return
   }
   try {
@@ -1284,6 +1332,9 @@ const loadDoneFromServer = async () => {
     if (res.code === 200 && Array.isArray(res.data)) {
       doneQuestionIds.value = new Set(
         res.data.map((v) => Number(v)).filter((v) => Number.isInteger(v) && v > 0),
+      )
+      pendingDoneQuestionIds.value = new Set(
+        [...pendingDoneQuestionIds.value].filter((id) => !doneQuestionIds.value.has(id)),
       )
     }
   } catch (_) {
@@ -1297,6 +1348,10 @@ const openDoneConfirmDialog = (questionId) => {
 
   if (authStore.isGuest) {
     doneTip.value = '游客模式不参与做题统计，登录后可计入排行榜。'
+    return
+  }
+  if (isQuestionDonePending(qid)) {
+    doneTip.value = '本题正在同步做题记录，请稍候。'
     return
   }
   if (isDoneQuestion(qid)) {
@@ -1315,8 +1370,10 @@ const closeDoneConfirmDialog = () => {
 }
 
 const applyQuestionDoneSuccess = (questionId) => {
-  doneQuestionIds.value.add(questionId)
+  updatePendingDoneQuestionSet((next) => next.delete(questionId))
+  updateDoneQuestionSet((next) => next.add(questionId))
   doneTip.value = '宸茶褰曟湰棰橈紝鎺掕姒滄暟鎹細鍚屾鏇存柊銆?'
+  doneTip.value = '已记录本题，排行榜数据会同步更新。'
   celebrateQuestionDone()
 }
 
@@ -1326,20 +1383,34 @@ const confirmMarkQuestionDone = async () => {
     closeDoneConfirmDialog()
     return
   }
+  if (isQuestionDonePending(qid)) {
+    return
+  }
 
+  doneConfirmVisible.value = false
+  pendingDoneQuestionId.value = null
   doneConfirmLoading.value = true
+  updatePendingDoneQuestionSet((next) => next.add(qid))
+  updateDoneQuestionSet((next) => next.add(qid))
+  let didSyncQuestionDone = false
+  doneTip.value = '正在记录本题...'
   try {
     const res = await api.post('/api/leaderboard/question-done', { questionId: qid })
     if (res.code !== 200) {
       throw new Error(res.msg || '上报失败')
     }
     applyQuestionDoneSuccess(qid)
+    didSyncQuestionDone = true
     doneTip.value = '已记录本题，排行榜数据会同步更新。'
     doneConfirmVisible.value = false
     pendingDoneQuestionId.value = null
   } catch (_) {
     doneTip.value = '记录失败，请稍后再试。'
   } finally {
+    if (!didSyncQuestionDone) {
+      updatePendingDoneQuestionSet((next) => next.delete(qid))
+      updateDoneQuestionSet((next) => next.delete(qid))
+    }
     doneConfirmLoading.value = false
   }
 }
@@ -1533,16 +1604,17 @@ const handleWindowResize = () => {
 }
 
 const refreshQuestionBankData = async () => {
-  await fetchCategoryOptions()
-  await fetchCustomBanks()
+  await Promise.all([
+    fetchCategoryOptions(),
+    fetchCustomBanks(),
+    loadDoneFromServer(),
+  ])
   syncCategoryToSelectedBank()
   await fetchQuestions(currentPage.value || 1)
-  await loadDoneFromServer()
 }
 
 useAutoPageRefresh(refreshQuestionBankData, {
-  throttleMs: 10000,
-  intervalMs: 20000,
+  throttleMs: 15000,
 })
 
 onMounted(async () => {

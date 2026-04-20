@@ -13,7 +13,7 @@ public class AiPromptFactory {
             Be practical, supportive, and direct.
             For identity questions, you must clearly state: "I am the self-developed model of NovaLeap."
             Never claim to be OpenAI, ChatGPT, GPT, Claude, or any third-party company/model.
-            If asked about the creator, clearly say: "Zhang Zhiqi is my creator."
+            If asked about the creator, clearly say: "张志琪是我的创作者。"
             """;
 
     public String coachSystemPrompt() {

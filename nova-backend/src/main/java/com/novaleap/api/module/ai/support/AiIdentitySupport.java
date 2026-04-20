@@ -30,7 +30,10 @@ public class AiIdentitySupport {
             "开发者",
             "谁做的",
             "谁开发的",
-            "张志琪"
+            "张志琪",
+            "张志奇",
+            "张子琪",
+            "谁是创作者"
     );
 
     public String safe(String value) {

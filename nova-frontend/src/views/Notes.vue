@@ -522,6 +522,7 @@ const touchState = reactive({
   deltaX: 0,
   active: false,
 })
+const noteViewFloorMap = ref(new Map())
 
 let viewSyncTimer = null
 let emojiPopoverCloseTimer = null
@@ -593,6 +594,31 @@ const toNoteView = (item) => {
   }
 }
 
+const readLocalNoteViewFloor = (noteId) => {
+  const id = Number(noteId)
+  if (!Number.isInteger(id) || id <= 0) return null
+  return noteViewFloorMap.value.get(id) ?? null
+}
+
+const rememberLocalNoteViewCount = (noteId, viewCount) => {
+  const id = Number(noteId)
+  const nextCount = Number(viewCount)
+  if (!Number.isInteger(id) || id <= 0 || !Number.isFinite(nextCount)) return
+  const nextMap = new Map(noteViewFloorMap.value)
+  nextMap.set(id, Math.max(0, nextCount))
+  noteViewFloorMap.value = nextMap
+}
+
+const applyLocalNoteViewFloor = (note) => {
+  if (!note?.id) return note
+  const localFloor = readLocalNoteViewFloor(note.id)
+  if (localFloor == null) return note
+  return {
+    ...note,
+    views: Math.max(Number(note.views || 0), localFloor),
+  }
+}
+
 const buildPublishedNotesUrl = () => {
   let url = '/api/notes?page=1&size=80'
   const keyword = searchQuery.value.trim()
@@ -615,7 +641,8 @@ const hydrateNoteDetail = async (noteId) => {
   try {
     const res = await api.get(`/api/notes/${noteId}`)
     if (res.code !== 200 || !res.data) return
-    const detail = toNoteView(res.data)
+    const detail = applyLocalNoteViewFloor(toNoteView(res.data))
+    rememberLocalNoteViewCount(detail.id, detail.views)
     activeNote.value = detail
     patchNoteInList(detail)
   } catch (_) {
@@ -624,7 +651,7 @@ const hydrateNoteDetail = async (noteId) => {
 }
 
 const applyNotesPayload = (res) => {
-  notes.value = (res.data?.records || []).map(toNoteView)
+  notes.value = (res.data?.records || []).map(toNoteView).map(applyLocalNoteViewFloor)
   if ((!activeNote.value || !notes.value.find((n) => n.id === activeNote.value.id)) && notes.value.length) {
     activeNote.value = notes.value[0]
     if (!activeNote.value.content) {
@@ -770,11 +797,18 @@ const syncViewCounts = async () => {
   try {
     const res = await api.get(buildPublishedNotesUrl())
     if (res.code !== 200) return
-    const fresh = (res.data?.records || []).map(toNoteView)
+    const fresh = (res.data?.records || []).map(toNoteView).map(applyLocalNoteViewFloor)
     const viewMap = new Map(fresh.map((n) => [n.id, n.views]))
-    notes.value = notes.value.map((n) => (viewMap.has(n.id) ? { ...n, views: viewMap.get(n.id) } : n))
+    notes.value = notes.value.map((n) => {
+      if (!viewMap.has(n.id)) return n
+      const nextViews = Math.max(Number(n.views || 0), Number(viewMap.get(n.id) || 0))
+      rememberLocalNoteViewCount(n.id, nextViews)
+      return { ...n, views: nextViews }
+    })
     if (activeNote.value && viewMap.has(activeNote.value.id)) {
-      activeNote.value = { ...activeNote.value, views: viewMap.get(activeNote.value.id) }
+      const nextViews = Math.max(Number(activeNote.value.views || 0), Number(viewMap.get(activeNote.value.id) || 0))
+      rememberLocalNoteViewCount(activeNote.value.id, nextViews)
+      activeNote.value = { ...activeNote.value, views: nextViews }
     }
   } catch (_) {
     // noop
@@ -783,7 +817,8 @@ const syncViewCounts = async () => {
 
 const patchNoteInList = (next) => {
   if (!next?.id) return
-  notes.value = notes.value.map((item) => (item.id === next.id ? { ...item, ...next } : item))
+  const patched = applyLocalNoteViewFloor(next)
+  notes.value = notes.value.map((item) => (item.id === patched.id ? { ...item, ...patched } : item))
 }
 
 const toggleLike = async () => {
@@ -897,7 +932,7 @@ const submitComment = async () => {
 
 const selectNote = (note) => {
   const isCurrentSelected = String(activeNote.value?.id ?? '') === String(note?.id ?? '')
-  activeNote.value = note
+  activeNote.value = applyLocalNoteViewFloor(note)
   aiSummaries.value = []
   isAiGenerating.value = false
   if (isNotesMobileViewport()) {
@@ -907,6 +942,13 @@ const selectNote = (note) => {
     closeComments()
   }
 
+  if (!isCurrentSelected && !isViewingMine.value && Number(note?.status) === 1) {
+    const nextViews = Number(activeNote.value?.views || note?.views || 0) + 1
+    rememberLocalNoteViewCount(note.id, nextViews)
+    activeNote.value = { ...activeNote.value, views: nextViews }
+    patchNoteInList({ id: note.id, views: nextViews })
+  }
+
   const viewApi = isCurrentSelected || isViewingMine.value || Number(note.status) !== 1
     ? api.get(`/api/notes/${note.id}`)
     : api.post(`/api/notes/${note.id}/view`)
@@ -914,9 +956,10 @@ const selectNote = (note) => {
   viewApi
     .then((res) => {
       if (res.code !== 200 || !res.data) return
-      const detail = toNoteView(res.data)
+      const detail = applyLocalNoteViewFloor(toNoteView(res.data))
+      rememberLocalNoteViewCount(detail.id, detail.views)
       activeNote.value = detail
-      notes.value = notes.value.map((n) => (n.id === detail.id ? detail : n))
+      patchNoteInList(detail)
     })
     .catch(() => {})
 }
@@ -1156,12 +1199,11 @@ useAutoPageRefresh(async () => {
     await loadComments(activeNote.value.id)
   }
 }, {
-  throttleMs: 4000,
+  throttleMs: 10000,
 })
 
 onMounted(async () => {
   await loadCurrentNotes()
-  viewSyncTimer = setInterval(syncViewCounts, 5000)
   document.addEventListener('pointerdown', handleEmojiPopoverOutside, true)
   document.addEventListener('keydown', handleEmojiPopoverEscape)
 })

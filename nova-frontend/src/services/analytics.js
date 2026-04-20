@@ -27,7 +27,7 @@ export function regenerateVisitorId() {
   return visitorId
 }
 
-export async function reportVisit(path) {
+export function reportVisit(path) {
   const safePath = typeof path === 'string' && path.length ? path : '/'
   const now = Date.now()
 
@@ -38,25 +38,38 @@ export async function reportVisit(path) {
   lastTrackedPath = safePath
   lastTrackedAt = now
 
+  const payload = JSON.stringify({
+    visitorId: getVisitorId(),
+    path: safePath
+  })
+
+  const token = sessionStorage.getItem('nova_token') || localStorage.getItem('nova_token')
+  const targetUrl = withApiBase('/api/analytics/visit')
+
+  if (!token && typeof navigator !== 'undefined' && typeof navigator.sendBeacon === 'function') {
+    try {
+      const beaconBody = new Blob([payload], { type: 'application/json' })
+      if (navigator.sendBeacon(targetUrl, beaconBody)) {
+        return
+      }
+    } catch (_) {
+      // fall through to fetch
+    }
+  }
+
   const headers = {
     'Content-Type': 'application/json'
   }
-
-  const token = sessionStorage.getItem('nova_token') || localStorage.getItem('nova_token')
   if (token) {
     headers.Authorization = `Bearer ${token}`
   }
 
-  try {
-    await fetch(withApiBase('/api/analytics/visit'), {
-      method: 'POST',
-      headers,
-      body: JSON.stringify({
-        visitorId: getVisitorId(),
-        path: safePath
-      })
-    })
-  } catch (_) {
+  fetch(targetUrl, {
+    method: 'POST',
+    headers,
+    body: payload,
+    keepalive: true,
+  }).catch(() => {
     // do not break UI for analytics failures
-  }
+  })
 }

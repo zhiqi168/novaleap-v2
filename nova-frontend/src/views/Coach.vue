@@ -76,9 +76,11 @@
               <div v-else class="flex max-w-[940px] gap-3.5">
                 <div class="avatar-shell ai-avatar">
                   <img
-                    src="https://raw.githubusercontent.com/Tarikul-Islam-Anik/Animated-Fluent-Emojis/master/Emojis/Smilies/Smiling%20Face%20with%20Sunglasses.png"
+                    :src="coachAvatarSrc"
                     alt="ai-avatar"
                     class="w-full h-full object-cover"
+                    loading="eager"
+                    decoding="async"
                   />
                 </div>
                 <div class="flex-1 min-w-0">
@@ -170,6 +172,7 @@
 <script setup>
 import { computed, nextTick, onMounted, ref, watch } from 'vue'
 import TypeWriter from '@/components/common/TypeWriter.vue'
+import coachAvatarSrc from '@/assets/logo.png'
 import { useAutoPageRefresh } from '@/composables/useAutoPageRefresh'
 import { useSSE } from '@/composables/useSSE'
 import { api } from '@/composables/useRequest'

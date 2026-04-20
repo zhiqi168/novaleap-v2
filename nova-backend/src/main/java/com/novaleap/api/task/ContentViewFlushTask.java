@@ -74,6 +74,7 @@ public class ContentViewFlushTask {
         }
 
         if (success > 0) {
+            questionReadCacheSupport.evictQuestionLists();
             log.info("[perf][question-view-flush] flushedKeys={} flushedDelta={}", success, totalDelta);
         }
     }
@@ -109,6 +110,8 @@ public class ContentViewFlushTask {
         }
 
         if (success > 0) {
+            noteReadCacheSupport.evictPublicLists();
+            noteReadCacheSupport.evictAllMineLists();
             log.info("[perf][note-view-flush] flushedKeys={} flushedDelta={}", success, totalDelta);
         }
     }
