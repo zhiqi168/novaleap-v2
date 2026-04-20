@@ -36,7 +36,7 @@
           </button>
         </nav>
 
-        <div class="nav-actions hidden sm:flex">
+        <div class="nav-actions hidden xl:flex">
           <button
             type="button"
             class="icon-btn"
@@ -74,7 +74,7 @@
           </button>
         </div>
 
-        <button type="button" class="icon-btn nav-mobile-trigger" @click="mobileMenuOpen = true">
+        <button type="button" class="icon-btn nav-mobile-trigger xl:hidden" @click="mobileMenuOpen = true">
           <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.9" d="M4 6h16M4 12h16m-7 6h7" />
           </svg>
@@ -82,9 +82,9 @@
       </div>
     </header>
 
-    <div v-if="mobileMenuOpen" class="mobile-mask sm:hidden" @click="mobileMenuOpen = false"></div>
+    <div v-if="mobileMenuOpen" class="mobile-mask xl:hidden" @click="mobileMenuOpen = false"></div>
 
-    <aside class="mobile-drawer sm:hidden" :class="mobileMenuOpen ? 'translate-x-0' : 'translate-x-full'">
+    <aside class="mobile-drawer xl:hidden" :class="mobileMenuOpen ? 'translate-x-0' : 'translate-x-full'">
       <div class="flex items-center justify-between px-5 py-5">
         <div>
           <p class="text-lg font-semibold tracking-[-0.03em] text-text-primary">导航</p>
@@ -605,11 +605,16 @@ onBeforeUnmount(() => {
 
 @media (max-width: 1279px) {
   .floating-nav {
-    grid-template-columns: auto 1fr;
+    grid-template-columns: auto 1fr auto;
   }
 
   .nav-actions {
     margin-left: auto;
+  }
+
+  .nav-mobile-trigger {
+    display: inline-flex;
+    justify-self: end;
   }
 
   .workspace-host {
@@ -626,11 +631,6 @@ onBeforeUnmount(() => {
   .floating-nav {
     grid-template-columns: auto 1fr auto;
     padding: 7px 8px;
-  }
-
-  .nav-mobile-trigger {
-    display: inline-flex;
-    justify-self: end;
   }
 
   .app-header-spacer {

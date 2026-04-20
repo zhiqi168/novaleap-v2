@@ -16,6 +16,7 @@ import com.novaleap.api.module.admin.question.dto.AdminQuestionSaveRequest;
 import com.novaleap.api.module.admin.question.support.AdminQuestionCategorySupport;
 import com.novaleap.api.module.admin.question.vo.AdminQuestionCategoryVO;
 import com.novaleap.api.module.admin.question.vo.AdminQuestionVO;
+import com.novaleap.api.module.question.support.QuestionReadCacheSupport;
 import com.novaleap.api.module.system.catalog.QuestionCategoryCatalog;
 import org.springframework.stereotype.Service;
 
@@ -35,15 +36,18 @@ public class AdminQuestionApplicationService {
     private final QuestionMapper questionMapper;
     private final QuestionCategoryMapper questionCategoryMapper;
     private final CustomQuestionBankMapper customQuestionBankMapper;
+    private final QuestionReadCacheSupport questionReadCacheSupport;
 
     public AdminQuestionApplicationService(
             QuestionMapper questionMapper,
             QuestionCategoryMapper questionCategoryMapper,
-            CustomQuestionBankMapper customQuestionBankMapper
+            CustomQuestionBankMapper customQuestionBankMapper,
+            QuestionReadCacheSupport questionReadCacheSupport
     ) {
         this.questionMapper = questionMapper;
         this.questionCategoryMapper = questionCategoryMapper;
         this.customQuestionBankMapper = customQuestionBankMapper;
+        this.questionReadCacheSupport = questionReadCacheSupport;
     }
 
     public Page<AdminQuestionVO> getQuestionList(Integer page, Integer size, String category, Integer difficulty, String keyword) {
@@ -85,6 +89,7 @@ public class AdminQuestionApplicationService {
         applyQuestionFields(question, request, category, difficulty, status);
         question.setCreatedAt(LocalDateTime.now());
         questionMapper.insert(question);
+        questionReadCacheSupport.evictAllQuestionReadCaches();
         return toVO(question, loadCategoryOptions());
     }
 
@@ -98,12 +103,18 @@ public class AdminQuestionApplicationService {
         validateQuestionRequest(request, category, difficulty, status);
         applyQuestionFields(question, request, category, difficulty, status);
         questionMapper.updateById(question);
+        questionReadCacheSupport.evictAllQuestionReadCaches();
+        questionReadCacheSupport.evictQuestionDetail(id);
+        questionReadCacheSupport.evictQuestionAnswer(id);
         return toVO(question, loadCategoryOptions());
     }
 
     public void deleteQuestion(Long id) {
         loadQuestion(id);
         questionMapper.deleteById(id);
+        questionReadCacheSupport.evictAllQuestionReadCaches();
+        questionReadCacheSupport.evictQuestionDetail(id);
+        questionReadCacheSupport.evictQuestionAnswer(id);
     }
 
     public List<AdminQuestionCategoryVO> getQuestionCategoryList() {
@@ -166,6 +177,7 @@ public class AdminQuestionApplicationService {
         vo.setQuestionCount(0L);
         vo.setBankCount(0L);
         vo.setDeletable(true);
+        questionReadCacheSupport.evictQuestionCategories();
         return vo;
     }
 
@@ -198,6 +210,7 @@ public class AdminQuestionApplicationService {
         }
 
         questionCategoryMapper.deleteById(category.getId());
+        questionReadCacheSupport.evictQuestionCategories();
     }
 
     private Question loadQuestion(Long id) {

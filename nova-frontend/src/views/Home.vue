@@ -107,6 +107,7 @@ import tipQr from '@/assets/tip-qr.jpg'
 import HomeFooterCta from '@/components/home/HomeFooterCta.vue'
 import HomeHero from '@/components/home/HomeHero.vue'
 import HomeStorySection from '@/components/home/HomeStorySection.vue'
+import { useAutoPageRefresh } from '@/composables/useAutoPageRefresh'
 import { api } from '@/composables/useRequest'
 import { useAuthStore } from '@/stores/auth'
 import { useRouter } from 'vue-router'
@@ -122,7 +123,6 @@ const isFooterZone = ref(false)
 const showBackToTop = ref(false)
 
 let tickTimer = null
-let leaderboardTimer = null
 let revealObserver = null
 let heroObserver = null
 let footerObserver = null
@@ -272,6 +272,11 @@ const loadLeaderboard = async () => {
   }
 }
 
+useAutoPageRefresh(loadLeaderboard, {
+  throttleMs: 15000,
+  intervalMs: 30000,
+})
+
 const emitHomeActive = (sectionId) => {
   window.dispatchEvent(new CustomEvent('nova-home-active', { detail: { section: sectionId } }))
 }
@@ -401,7 +406,6 @@ const initFooterObserver = () => {
 
 onMounted(async () => {
   await loadLeaderboard()
-  leaderboardTimer = window.setInterval(loadLeaderboard, 5000)
   tickTimer = window.setInterval(() => {
     currentHour.value = new Date().getHours()
   }, 60000)
@@ -424,7 +428,6 @@ onUnmounted(() => {
   if (pageRef.value) {
     pageRef.value.removeEventListener('scroll', handleScroll)
   }
-  if (leaderboardTimer) clearInterval(leaderboardTimer)
   if (tickTimer) clearInterval(tickTimer)
   if (revealObserver) revealObserver.disconnect()
   if (heroObserver) heroObserver.disconnect()

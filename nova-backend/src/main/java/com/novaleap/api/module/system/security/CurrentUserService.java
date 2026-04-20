@@ -15,10 +15,16 @@ public class CurrentUserService {
 
     private final UserMapper userMapper;
     private final AuthRoleSupport authRoleSupport;
+    private final CurrentUserCacheSupport currentUserCacheSupport;
 
-    public CurrentUserService(UserMapper userMapper, AuthRoleSupport authRoleSupport) {
+    public CurrentUserService(
+            UserMapper userMapper,
+            AuthRoleSupport authRoleSupport,
+            CurrentUserCacheSupport currentUserCacheSupport
+    ) {
         this.userMapper = userMapper;
         this.authRoleSupport = authRoleSupport;
+        this.currentUserCacheSupport = currentUserCacheSupport;
     }
 
     public CurrentUser current(Authentication authentication) {
@@ -61,9 +67,17 @@ public class CurrentUserService {
         if (!currentUser.isMember()) {
             return null;
         }
-        return userMapper.selectOne(new LambdaQueryWrapper<User>()
+        User cached = currentUserCacheSupport.readByUsername(currentUser.safeUsername());
+        if (cached != null) {
+            return cached;
+        }
+        User user = userMapper.selectOne(new LambdaQueryWrapper<User>()
                 .eq(User::getUsername, currentUser.safeUsername())
                 .last("LIMIT 1"));
+        if (user != null) {
+            currentUserCacheSupport.writeByUsername(currentUser.safeUsername(), user);
+        }
+        return user;
     }
 
     public User requireDatabaseUser(Authentication authentication, String guestMessage) {

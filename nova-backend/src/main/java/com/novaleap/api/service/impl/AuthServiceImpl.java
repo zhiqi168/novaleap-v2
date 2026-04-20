@@ -16,6 +16,7 @@ import com.novaleap.api.module.auth.support.AuthRoleSupport;
 import com.novaleap.api.module.auth.support.AuthTokenStateSupport;
 import com.novaleap.api.module.auth.support.AvatarSupport;
 import com.novaleap.api.module.auth.support.TurnstileVerifier;
+import com.novaleap.api.module.system.security.CurrentUserCacheSupport;
 import com.novaleap.api.service.AuthService;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
@@ -41,6 +42,7 @@ public class AuthServiceImpl extends ServiceImpl<UserMapper, User> implements Au
     private final AuthTokenStateSupport authTokenStateSupport;
     private final AuthRoleSupport authRoleSupport;
     private final SharedAuthLoginService sharedAuthLoginService;
+    private final CurrentUserCacheSupport currentUserCacheSupport;
 
     public AuthServiceImpl(
             AuthRateLimitSupport authRateLimitSupport,
@@ -50,7 +52,8 @@ public class AuthServiceImpl extends ServiceImpl<UserMapper, User> implements Au
             TurnstileVerifier turnstileVerifier,
             AuthTokenStateSupport authTokenStateSupport,
             AuthRoleSupport authRoleSupport,
-            SharedAuthLoginService sharedAuthLoginService
+            SharedAuthLoginService sharedAuthLoginService,
+            CurrentUserCacheSupport currentUserCacheSupport
     ) {
         this.authRateLimitSupport = authRateLimitSupport;
         this.authPasswordSupport = authPasswordSupport;
@@ -60,6 +63,7 @@ public class AuthServiceImpl extends ServiceImpl<UserMapper, User> implements Au
         this.authTokenStateSupport = authTokenStateSupport;
         this.authRoleSupport = authRoleSupport;
         this.sharedAuthLoginService = sharedAuthLoginService;
+        this.currentUserCacheSupport = currentUserCacheSupport;
     }
 
     @Override
@@ -134,6 +138,7 @@ public class AuthServiceImpl extends ServiceImpl<UserMapper, User> implements Au
         } catch (DataIntegrityViolationException e) {
             throw new IllegalArgumentException("该邮箱已注册");
         }
+        currentUserCacheSupport.writeByUsername(user.getUsername(), user);
         return sharedAuthLoginService.buildAuthResult(user, true, AuthPortal.CLIENT);
     }
 
@@ -164,6 +169,7 @@ public class AuthServiceImpl extends ServiceImpl<UserMapper, User> implements Au
 
         user.setPassword(authPasswordSupport.encode(newPasswordValue));
         updateById(user);
+        currentUserCacheSupport.writeByUsername(user.getUsername(), user);
         authTokenStateSupport.invalidateUserTokens(user.getUsername());
     }
 
@@ -216,6 +222,7 @@ public class AuthServiceImpl extends ServiceImpl<UserMapper, User> implements Au
             avatarSupport.saveAvatar(username, normalizedAvatar);
         }
         updateById(user);
+        currentUserCacheSupport.writeByUsername(user.getUsername(), user);
         return buildProfilePayload(user);
     }
 
@@ -241,7 +248,13 @@ public class AuthServiceImpl extends ServiceImpl<UserMapper, User> implements Au
     }
 
     private User getUserByUsernameOrThrow(String username) {
-        User user = getOne(new LambdaQueryWrapper<User>().eq(User::getUsername, username));
+        User user = currentUserCacheSupport.readByUsername(username);
+        if (user == null) {
+            user = getOne(new LambdaQueryWrapper<User>().eq(User::getUsername, username));
+            if (user != null) {
+                currentUserCacheSupport.writeByUsername(username, user);
+            }
+        }
         if (user == null) {
             throw new NotFoundException("用户不存在");
         }

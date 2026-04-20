@@ -40,6 +40,16 @@ public class LeaderboardController {
         return Result.success(data);
     }
 
+    @GetMapping("/me")
+    public Result<Map<String, Object>> getCurrentUserSnapshot(Authentication authentication) {
+        if (currentUserService.isAnonymous(authentication) || currentUserService.isGuest(authentication)) {
+            return Result.success(Collections.emptyMap());
+        }
+        return Result.success(
+                leaderboardService.getUserSnapshot(currentUserService.current(authentication).safeUsername())
+        );
+    }
+
     @GetMapping("/question-done")
     public Result<List<Long>> getDoneQuestions(Authentication authentication) {
         if (currentUserService.isAnonymous(authentication) || currentUserService.isGuest(authentication)) {

@@ -13,6 +13,7 @@ import com.novaleap.api.module.admin.questionbank.assembler.AdminQuestionBankVie
 import com.novaleap.api.module.admin.questionbank.dto.AdminQuestionBankAuditRequest;
 import com.novaleap.api.module.admin.questionbank.vo.AdminOfficialQuestionImportVO;
 import com.novaleap.api.module.admin.questionbank.vo.AdminQuestionBankVO;
+import com.novaleap.api.module.question.support.QuestionReadCacheSupport;
 import com.novaleap.api.module.questionbank.support.QuestionBankSupport;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -36,19 +37,22 @@ public class AdminQuestionBankAuditService {
     private final UserMapper userMapper;
     private final QuestionBankImportService questionBankImportService;
     private final QuestionBankSupport questionBankSupport;
+    private final QuestionReadCacheSupport questionReadCacheSupport;
 
     public AdminQuestionBankAuditService(
             CustomQuestionBankMapper customQuestionBankMapper,
             QuestionMapper questionMapper,
             UserMapper userMapper,
             QuestionBankImportService questionBankImportService,
-            QuestionBankSupport questionBankSupport
+            QuestionBankSupport questionBankSupport,
+            QuestionReadCacheSupport questionReadCacheSupport
     ) {
         this.customQuestionBankMapper = customQuestionBankMapper;
         this.questionMapper = questionMapper;
         this.userMapper = userMapper;
         this.questionBankImportService = questionBankImportService;
         this.questionBankSupport = questionBankSupport;
+        this.questionReadCacheSupport = questionReadCacheSupport;
     }
 
     public Page<AdminQuestionBankVO> getQuestionBankList(int page, int size, Integer status, String keyword) {
@@ -123,6 +127,7 @@ public class AdminQuestionBankAuditService {
         result.setDifficulty(finalDifficulty);
         result.setParsedQuestionCount(payload.questions().size());
         result.setImportedQuestionCount(inserted);
+        questionReadCacheSupport.evictAllQuestionReadCaches();
         return result;
     }
 
@@ -180,6 +185,8 @@ public class AdminQuestionBankAuditService {
         bank.setAuditedAt(LocalDateTime.now());
         bank.setUpdatedAt(LocalDateTime.now());
         customQuestionBankMapper.updateById(bank);
+        questionReadCacheSupport.evictAllQuestionReadCaches();
+        questionReadCacheSupport.evictMyBanks(bank.getUserId());
 
         enrichOwners(List.of(bank));
         return AdminQuestionBankViewAssembler.toVO(bank, questionBankSupport);

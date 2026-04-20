@@ -33,7 +33,7 @@
     <section class="icp-footer">
       <div class="icp-inner">
         <p>© 2026 NovaLeap. 本网站原创内容（题目答案解析、图谱数据、UI界面设计、交互逻辑、视觉风格、功能架构及全部程序代码）均为本站版权所有，未经书面授权禁止任何形式的复制、转载或仿冒。</p>
-        <p>ICP备案号：待补充</p>
+        <p>本网站当前使用境外服务器部署，暂不涉及 ICP 备案号展示</p>
       </div>
     </section>
   </footer>

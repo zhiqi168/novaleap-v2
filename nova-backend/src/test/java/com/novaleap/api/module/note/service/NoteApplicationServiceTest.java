@@ -7,6 +7,7 @@ import com.novaleap.api.mapper.NoteCommentMapper;
 import com.novaleap.api.mapper.NoteLikeMapper;
 import com.novaleap.api.mapper.NoteMapper;
 import com.novaleap.api.module.note.dto.NoteCreateRequest;
+import com.novaleap.api.module.note.support.NoteReadCacheSupport;
 import com.novaleap.api.module.system.security.CurrentUserService;
 import com.novaleap.api.service.AiService;
 import org.junit.jupiter.api.Test;
@@ -43,6 +44,9 @@ class NoteApplicationServiceTest {
     private AiService aiService;
 
     @Mock
+    private NoteReadCacheSupport noteReadCacheSupport;
+
+    @Mock
     private Authentication authentication;
 
     @Test
@@ -52,7 +56,8 @@ class NoteApplicationServiceTest {
                 noteLikeMapper,
                 noteCommentMapper,
                 currentUserService,
-                aiService
+                aiService,
+                noteReadCacheSupport
         );
         User user = new User();
         user.setId(7L);
@@ -88,7 +93,8 @@ class NoteApplicationServiceTest {
                 noteLikeMapper,
                 noteCommentMapper,
                 currentUserService,
-                aiService
+                aiService,
+                noteReadCacheSupport
         );
         Note note = new Note();
         note.setId(1L);

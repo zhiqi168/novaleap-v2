@@ -590,6 +590,7 @@
 
 <script setup>
 import { computed, nextTick, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
+import confetti from 'canvas-confetti'
 import TypeWriter from '@/components/common/TypeWriter.vue'
 import LoadingDots from '@/components/common/LoadingDots.vue'
 import { useAutoPageRefresh } from '@/composables/useAutoPageRefresh'
@@ -775,6 +776,51 @@ const normalizeCategoryDisplayName = (code, name = '') => {
 const defaultImportCategory = () => categories.value.find((item) => item.id !== 'all')?.id || 'java'
 const hasCategoryCode = (code) => categories.value.some((item) => item.id === code)
 const isMobileViewport = () => window.innerWidth < 768
+const QUESTION_DONE_CONFETTI_DURATION_MS = 3 * 1000
+let questionDoneConfettiIntervalId = 0
+
+const stopQuestionDoneConfetti = () => {
+  if (questionDoneConfettiIntervalId) {
+    clearInterval(questionDoneConfettiIntervalId)
+    questionDoneConfettiIntervalId = 0
+  }
+  confetti.reset()
+}
+
+const randomInRange = (min, max) => Math.random() * (max - min) + min
+
+const celebrateQuestionDone = () => {
+  stopQuestionDoneConfetti()
+
+  const duration = QUESTION_DONE_CONFETTI_DURATION_MS
+  const animationEnd = Date.now() + duration
+  const defaults = {
+    startVelocity: 30,
+    spread: 360,
+    ticks: 60,
+    zIndex: 1200,
+  }
+
+  questionDoneConfettiIntervalId = window.setInterval(() => {
+    const timeLeft = animationEnd - Date.now()
+    if (timeLeft <= 0) {
+      stopQuestionDoneConfetti()
+      return
+    }
+
+    const particleCount = 50 * (timeLeft / duration)
+    confetti({
+      ...defaults,
+      particleCount,
+      origin: { x: randomInRange(0.1, 0.3), y: Math.random() - 0.2 },
+    })
+    confetti({
+      ...defaults,
+      particleCount,
+      origin: { x: randomInRange(0.7, 0.9), y: Math.random() - 0.2 },
+    })
+  }, 250)
+}
 
 const applyCategoryOptions = (rows) => {
   const next = [{ id: 'all', name: '全部分类' }]
@@ -1080,7 +1126,7 @@ const hydrateQuestionDetail = async (questionId, fallbackQuestion = null) => {
     return
   }
   try {
-    const res = await api.get(`/api/questions/${qid}?_t=${Date.now()}`, { cache: 'no-store' })
+    const res = await api.get(`/api/questions/${qid}`)
     if (res.code === 200 && res.data) {
       const latestListQuestion = questions.value.find((item) => Number(item?.id || 0) === qid)
       const mergedViewCount = Math.max(
@@ -1155,9 +1201,9 @@ const openQuestion = async (question) => {
     return
   }
 
-  clearAnswerPanels()
-  await markQuestionViewed(qid)
+    clearAnswerPanels()
   await hydrateQuestionDetail(qid, question)
+  void markQuestionViewed(qid)
   if (window.innerWidth < 768) {
     mobileTab.value = 'detail'
   }
@@ -1268,6 +1314,12 @@ const closeDoneConfirmDialog = () => {
   pendingDoneQuestionId.value = null
 }
 
+const applyQuestionDoneSuccess = (questionId) => {
+  doneQuestionIds.value.add(questionId)
+  doneTip.value = '宸茶褰曟湰棰橈紝鎺掕姒滄暟鎹細鍚屾鏇存柊銆?'
+  celebrateQuestionDone()
+}
+
 const confirmMarkQuestionDone = async () => {
   const qid = Number(pendingDoneQuestionId.value)
   if (!Number.isInteger(qid) || qid <= 0) {
@@ -1281,7 +1333,7 @@ const confirmMarkQuestionDone = async () => {
     if (res.code !== 200) {
       throw new Error(res.msg || '上报失败')
     }
-    doneQuestionIds.value.add(qid)
+    applyQuestionDoneSuccess(qid)
     doneTip.value = '已记录本题，排行榜数据会同步更新。'
     doneConfirmVisible.value = false
     pendingDoneQuestionId.value = null
@@ -1310,7 +1362,7 @@ const markQuestionDone = async (questionId) => {
     if (res.code !== 200) {
       throw new Error(res.msg || '上报失败')
     }
-    doneQuestionIds.value.add(qid)
+    applyQuestionDoneSuccess(qid)
     doneTip.value = '已记录本题，排行榜数据会同步更新。'
   } catch (_) {
     doneTip.value = '记录失败，请稍后再试。'
@@ -1489,7 +1541,8 @@ const refreshQuestionBankData = async () => {
 }
 
 useAutoPageRefresh(refreshQuestionBankData, {
-  throttleMs: 5000,
+  throttleMs: 10000,
+  intervalMs: 20000,
 })
 
 onMounted(async () => {
@@ -1500,6 +1553,7 @@ onMounted(async () => {
 })
 
 onUnmounted(() => {
+  stopQuestionDoneConfetti()
   window.removeEventListener('resize', handleWindowResize)
 })
 </script>

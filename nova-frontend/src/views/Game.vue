@@ -166,14 +166,20 @@ const BASE_PACE = 0.34
 const PLAYER_DEPTH = 0.9
 const PLAYER_ZONE_START = PLAYER_DEPTH - 0.05
 const PLAYER_ZONE_END = PLAYER_DEPTH + 0.04
-const PLAYER_COLLISION_END = PLAYER_ZONE_END
+const PLAYER_COLLISION_DEPTH = PLAYER_ZONE_START + 0.005
+const PLAYER_COLLISION_TOLERANCE = 0.016
 const RUNNER_SPRITE_ASPECT = 1
 const RUNNER_FLOOR_OFFSET = 6
+const RUNNER_LANE_SPRING = 74
+const RUNNER_LANE_DAMPING = 13
+const RUNNER_LANE_SWITCH_IMPULSE = 4.2
 const GAME_TITLE = '光跃者'
 const GAME_MODE_LABEL = '三轨裂隙冲线'
 const GAME_TAGLINE = '左右切道，收集辉光核心，避开异界怪物'
 const GAME_DESCRIPTION = '穿过夜幕裂隙，吞没辉光核心，在怪物压境前把速度和分数一起拉满。'
 const GAME_GOAL_LABEL = '收集辉光核心，突破怪群封锁'
+const LIVE_REPORT_INTERVAL_MS = 10000
+const LIVE_REPORT_MIN_DELTA = 80
 const gameCanvas = ref(null)
 const gameState = ref('idle')
 const activeGame = ref(null)
@@ -226,7 +232,7 @@ const interactionHint = computed(() => isMobile.value ? '操作：左右滑动�
 
 const view = { width: 0, height: 0 }
 const world = { pace: BASE_PACE, targetPace: BASE_PACE, elapsed: 0, distance: 0, spawnTimer: 0.72, stripeOffset: 0, cloudOffset: 0, hillOffset: 0, treeOffset: 0, shakeTime: 0, shakePower: 0, guideTime: 0, collectFlash: 0 }
-const runner = { lane: 0, laneVisual: 0, w: 114, h: 114, tilt: 0, hitFlash: 0, collectPulse: 0 }
+const runner = { lane: 0, laneVisual: 0, laneVelocity: 0, w: 114, h: 114, tilt: 0, hitFlash: 0, collectPulse: 0 }
 
 const OBSTACLE_SET = {
   golem: {
@@ -604,9 +610,9 @@ const drawRoad = (dt) => {
     }
   }
 
-  const collisionLeft = laneXAtDepth(-1.45, PLAYER_ZONE_START + 0.005)
-  const collisionRight = laneXAtDepth(1.45, PLAYER_ZONE_START + 0.005)
-  const collisionY = groundYAtDepth(PLAYER_ZONE_START + 0.005) + 2
+  const collisionLeft = laneXAtDepth(-1.45, PLAYER_COLLISION_DEPTH)
+  const collisionRight = laneXAtDepth(1.45, PLAYER_COLLISION_DEPTH)
+  const collisionY = groundYAtDepth(PLAYER_COLLISION_DEPTH) + 2
   const guideBoost = clamp(world.guideTime / 2.8, 0, 1)
   const guidePulse = 0.58 + (Math.sin(world.elapsed * 8) + 1) * 0.2
   ctx.strokeStyle = `rgba(255, 223, 204, ${0.44 + guideBoost * 0.22})`
@@ -855,6 +861,7 @@ const drawRunner = () => {
   const collectPop = runner.collectPulse > 0 ? Math.sin((1 - runner.collectPulse) * Math.PI) : 0
   const shadowWidth = pose.visualW * 0.28
   const shadowHeight = 12
+  const laneMotionLift = Math.min(7, Math.abs(runner.laneVelocity) * 4.2)
 
   const aura = ctx.createRadialGradient(pose.x + pose.visualW * 0.5, pose.y + pose.visualH * 0.56, 0, pose.x + pose.visualW * 0.5, pose.y + pose.visualH * 0.56, pose.visualW * 0.58)
   aura.addColorStop(0, 'rgba(124, 236, 255, 0.16)')
@@ -878,7 +885,7 @@ const drawRunner = () => {
 
   ctx.fillStyle = 'rgba(45, 34, 31, 0.28)'
   ctx.beginPath()
-  ctx.ellipse(pose.x + pose.visualW * 0.5, getGroundY() + 11, shadowWidth, shadowHeight, 0, 0, Math.PI * 2)
+  ctx.ellipse(pose.x + pose.visualW * 0.5, getGroundY() + 11, shadowWidth + Math.abs(runner.tilt) * 12, shadowHeight, 0, 0, Math.PI * 2)
   ctx.fill()
 
   ctx.save()
@@ -886,15 +893,17 @@ const drawRunner = () => {
   ctx.shadowBlur = 14
   ctx.shadowOffsetY = 14
   ctx.filter = hitImpact > 0.02 ? `brightness(${1 - hitImpact * 0.4})` : 'none'
+  ctx.translate(pose.x + pose.visualW * 0.5, pose.y + pose.visualH * 0.56 - laneMotionLift)
+  ctx.rotate(runner.tilt)
   if (runnerSpriteReady.value && runnerSprite) {
-    ctx.drawImage(runnerSprite, pose.x, pose.y, pose.visualW, pose.visualH)
+    ctx.drawImage(runnerSprite, -pose.visualW * 0.5, -pose.visualH * 0.56, pose.visualW, pose.visualH)
   } else {
     ctx.fillStyle = '#df6546'
-    roundedPath(pose.x + pose.visualW * 0.24, pose.y + pose.visualH * 0.18, pose.visualW * 0.52, pose.visualH * 0.62, pose.visualW * 0.18)
+    roundedPath(-pose.visualW * 0.26, -pose.visualH * 0.38, pose.visualW * 0.52, pose.visualH * 0.62, pose.visualW * 0.18)
     ctx.fill()
     ctx.fillStyle = '#101114'
     ctx.beginPath()
-    ctx.ellipse(pose.x + pose.visualW * 0.5, pose.y + pose.visualH * 0.24, pose.visualW * 0.18, pose.visualH * 0.14, 0, 0, Math.PI * 2)
+    ctx.ellipse(0, -pose.visualH * 0.32, pose.visualW * 0.18, pose.visualH * 0.14, 0, 0, Math.PI * 2)
     ctx.fill()
   }
   ctx.filter = 'none'
@@ -1057,6 +1066,7 @@ const spawnWave = () => {
 const resetRunner = () => {
   runner.lane = 0
   runner.laneVisual = 0
+  runner.laneVelocity = 0
   runner.tilt = 0
   runner.hitFlash = 0
   runner.collectPulse = 0
@@ -1083,6 +1093,7 @@ const moveLane = (delta) => {
   if (next === runner.lane) return
   const prev = runner.lane
   runner.lane = next
+  runner.laneVelocity += delta * RUNNER_LANE_SWITCH_IMPULSE
   addParticles(laneXAtDepth(prev + delta * 0.25, PLAYER_DEPTH), getGroundY() - 8, 8, ['#c9fbff', '#8eebff', '#ffd57a'], 110)
 }
 
@@ -1090,7 +1101,7 @@ const genRoundId = () => `light-leaper-${Date.now()}-${Math.floor(Math.random() 
 
 const submitScoreReport = async (value, options = {}) => {
   const { final = false, force = false } = options
-  if (value <= 0 || authStore.isGuest) return
+  if (value <= 0 || !authStore.isLoggedIn || authStore.isGuest) return
   if (final && finalScoreReported && !force) return
   if (liveReportInFlight && !final) return
   liveReportInFlight = true
@@ -1111,14 +1122,14 @@ const stopLiveReporter = () => {
 
 const startLiveReporter = () => {
   stopLiveReporter()
-  if (authStore.isGuest) return
+  if (!authStore.isLoggedIn || authStore.isGuest) return
   liveReporterTimer = window.setInterval(() => {
     if (gameState.value !== 'playing') return
     const now = Number(score.value || 0)
-    if (now <= 0 || now - liveReportedScore < 18) return
+    if (now <= 0 || now - liveReportedScore < LIVE_REPORT_MIN_DELTA) return
     liveReportedScore = now
     submitScoreReport(now, { final: false })
-  }, 1100)
+  }, LIVE_REPORT_INTERVAL_MS)
 }
 
 const finishRound = () => {
@@ -1138,8 +1149,15 @@ const finishRound = () => {
 }
 
 const updateRunner = (dt) => {
-  runner.laneVisual += (runner.lane - runner.laneVisual) * Math.min(1, dt * 13)
-  runner.tilt += (clamp((runner.lane - runner.laneVisual) * 0.34, -0.28, 0.28) - runner.tilt) * Math.min(1, dt * 10)
+  const laneDelta = runner.lane - runner.laneVisual
+  runner.laneVelocity += laneDelta * RUNNER_LANE_SPRING * dt
+  runner.laneVelocity *= Math.exp(-RUNNER_LANE_DAMPING * dt)
+  runner.laneVisual = clamp(runner.laneVisual + runner.laneVelocity * dt, -1, 1)
+  if (Math.abs(laneDelta) < 0.001 && Math.abs(runner.laneVelocity) < 0.001) {
+    runner.laneVisual = runner.lane
+    runner.laneVelocity = 0
+  }
+  runner.tilt += (clamp(runner.laneVelocity * 0.22, -0.28, 0.28) - runner.tilt) * Math.min(1, dt * 12)
   runner.hitFlash = Math.max(0, runner.hitFlash - dt * 2.2)
   runner.collectPulse = Math.max(0, runner.collectPulse - dt * 5.4)
   world.collectFlash = Math.max(0, world.collectFlash - dt * 3.2)
@@ -1166,19 +1184,15 @@ const updateGame = (dt) => {
     world.spawnTimer = Math.max(0.24, 0.76 - (world.pace - BASE_PACE) * 0.72) + Math.random() * 0.22
   }
 
-  const dangerRect = runnerDangerRect()
   for (let i = obstacles.length - 1; i >= 0; i--) {
     const obs = obstacles[i]
+    const prevDepth = obs.depth
     obs.depth += world.pace * obs.speedMul * dt
     obs.hitRect = obstacleGeometry(obs).hitRect
-    // Once the obstacle has crossed the player's hit line, it may remain on screen
-    // for visual continuity, but it should no longer be lethal.
-    const nearCollisionWindow = obs.depth >= PLAYER_ZONE_START - 0.06 && obs.depth <= PLAYER_COLLISION_END
-    const laneLockedImpact = Math.abs(runner.laneVisual - obs.lane) < 0.34
-      && obs.depth >= PLAYER_ZONE_START + 0.01
-      && obs.depth <= PLAYER_COLLISION_END
-    const visualImpact = rectsOverlap(dangerRect, obs.hitRect, 1, 2)
-    if (!obs.checked && nearCollisionWindow && (visualImpact || laneLockedImpact)) {
+    const crossedCollisionLine = prevDepth < PLAYER_COLLISION_DEPTH && obs.depth >= PLAYER_COLLISION_DEPTH
+    const onCollisionLine = Math.abs(obs.depth - PLAYER_COLLISION_DEPTH) <= PLAYER_COLLISION_TOLERANCE
+    const sameVisibleLane = Math.abs(runner.laneVisual - obs.lane) < 0.28
+    if (!obs.checked && sameVisibleLane && (crossedCollisionLine || onCollisionLine)) {
       finishRound()
       return
     }

@@ -13,6 +13,7 @@ import com.novaleap.api.module.admin.note.dto.AdminNoteSaveRequest;
 import com.novaleap.api.module.admin.note.dto.AdminNoteStatusRequest;
 import com.novaleap.api.module.admin.note.vo.AdminNoteDetailVO;
 import com.novaleap.api.module.admin.note.vo.AdminNoteListItemVO;
+import com.novaleap.api.module.note.support.NoteReadCacheSupport;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -24,15 +25,18 @@ public class AdminNoteApplicationService {
     private final NoteMapper noteMapper;
     private final NoteLikeMapper noteLikeMapper;
     private final NoteCommentMapper noteCommentMapper;
+    private final NoteReadCacheSupport noteReadCacheSupport;
 
     public AdminNoteApplicationService(
             NoteMapper noteMapper,
             NoteLikeMapper noteLikeMapper,
-            NoteCommentMapper noteCommentMapper
+            NoteCommentMapper noteCommentMapper,
+            NoteReadCacheSupport noteReadCacheSupport
     ) {
         this.noteMapper = noteMapper;
         this.noteLikeMapper = noteLikeMapper;
         this.noteCommentMapper = noteCommentMapper;
+        this.noteReadCacheSupport = noteReadCacheSupport;
     }
 
     public Page<AdminNoteListItemVO> getNoteList(
@@ -88,6 +92,8 @@ public class AdminNoteApplicationService {
         note.setUpdatedAt(LocalDateTime.now());
         
         noteMapper.insert(note);
+        noteReadCacheSupport.evictPublicLists();
+        noteReadCacheSupport.evictAllMineLists();
         return AdminNoteViewAssembler.toDetailVO(note);
     }
 
@@ -110,6 +116,7 @@ public class AdminNoteApplicationService {
         note.setUpdatedAt(LocalDateTime.now());
         
         noteMapper.updateById(note);
+        noteReadCacheSupport.evictNoteReadCaches(id);
         return AdminNoteViewAssembler.toDetailVO(note);
     }
 
@@ -136,6 +143,7 @@ public class AdminNoteApplicationService {
         updateWrapper.set(Note::getUpdatedAt, LocalDateTime.now());
         
         noteMapper.update(null, updateWrapper);
+        noteReadCacheSupport.evictNoteReadCaches(id);
         
         Note refreshed = noteMapper.selectById(id);
         return AdminNoteViewAssembler.toDetailVO(refreshed);
@@ -148,5 +156,6 @@ public class AdminNoteApplicationService {
             throw new NotFoundException("手记不存在");
         }
         noteMapper.deleteById(id);
+        noteReadCacheSupport.evictNoteReadCaches(id);
     }
 }

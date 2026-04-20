@@ -1,19 +1,17 @@
 <template>
   <div class="h-full relative overflow-hidden me-bg workspace-page workspace-scroll">
-    <canvas ref="confettiCanvas" class="absolute inset-0 z-20 w-full h-full pointer-events-none"></canvas>
-
     <div class="relative z-10 h-full overflow-y-auto custom-scrollbar">
-      <div class="workspace-stack max-w-[1120px] mx-auto text-center">
-        <section class="pt-1">
-        <h1 class="text-[clamp(40px,6vw,66px)] font-black leading-tight text-text-primary break-words">
+      <div class="workspace-stack me-shell max-w-[1120px] mx-auto text-center">
+        <section class="me-hero pt-1">
+        <h1 class="me-title text-[clamp(40px,6vw,66px)] font-black leading-tight text-text-primary break-words">
           {{ greetingPrefix }}，
-          <span class="me-name-highlight text-transparent bg-clip-text">
+          <span class="me-name-highlight me-title-name text-transparent bg-clip-text">
             {{ displayNickname }}
           </span>
         </h1>
-        <p class="mt-3 text-[clamp(28px,4.4vw,52px)] text-text-secondary leading-tight">{{ subLine }}</p>
+        <p class="me-subline mt-3 text-[clamp(28px,4.4vw,52px)] text-text-secondary leading-tight">{{ subLine }}</p>
 
-        <div class="mt-8 flex flex-col items-center relative">
+        <div class="me-action-stack mt-8 flex flex-col items-center relative">
           <button class="avatar-orbit" type="button" @click="goProfile" title="前往个人资料">
             <div class="avatar-core">
               <span v-if="isEmoji(displayAvatar)">{{ displayAvatar }}</span>
@@ -36,9 +34,9 @@
           </div>
         </div>
 
-        <div class="workspace-shell mt-10 bg-bg-surface backdrop-blur-xl rounded-3xl shadow-card border border-border-subtle p-7 md:p-8 text-left">
+        <div class="workspace-shell me-quote-card mt-10 bg-bg-surface backdrop-blur-xl rounded-3xl shadow-card border border-border-subtle p-7 md:p-8 text-left">
           <div class="text-xl font-bold text-text-primary">今日格言</div>
-          <div class="mt-5 text-[clamp(30px,4.2vw,52px)] font-medium text-text-primary tracking-tight leading-tight">{{ quote }}</div>
+          <div class="me-quote-text mt-5 text-[clamp(30px,4.2vw,52px)] font-medium text-text-primary tracking-tight leading-tight">{{ quote }}</div>
         </div>
         </section>
       </div>
@@ -47,7 +45,8 @@
 </template>
 
 <script setup>
-import { computed, nextTick, onActivated, onMounted, onUnmounted, ref, watch } from 'vue'
+import confetti from 'canvas-confetti'
+import { computed, onActivated, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { api } from '@/composables/useRequest'
@@ -74,6 +73,7 @@ const DAILY_QUOTE_FALLBACK = '把复杂问题拆小，你已经赢了一半。'
 const quote = ref(DAILY_QUOTE_FALLBACK)
 let dailyQuoteTimer = 0
 let latestQuoteRequestId = 0
+const isCompactViewport = () => window.innerWidth <= 768
 
 const todayKey = () => {
   const now = new Date()
@@ -192,70 +192,67 @@ const cheerPopupTimers = []
 let lastCheerLine = ''
 let cheerPopupSeed = 0
 
-const confettiCanvas = ref(null)
-let ctx = null
-let rafId = 0
-let cheerLoopTimer = 0
-const pieces = []
-const startupBurstTimers = []
-
-const CHEER_CHAIN_BURSTS = 3
-const CHEER_CHAIN_GAP_MS = 90
-const CHEER_STRENGTH = 1.55
 const CHEER_POPUP_LIMIT = 3
 const CHEER_POPUP_STAY_MS = 3000
 
-const ENTRY_CHAIN_BURSTS = 2
-const ENTRY_CHAIN_GAP_MS = 120
-const ENTRY_STRENGTH = 1.45
 
-const colors = ['#dc2626', '#ffffff', '#3b82f6', '#eab308', '#22c55e', '#ef4444', '#a855f7']
-const rand = (a, b) => a + Math.random() * (b - a)
+const CONFETTI_DURATION_MS = 1000
+const CONFETTI_SPREAD = 40
+const CONFETTI_RICH_COLORS = ['#bb0000','#f89aa5','#121314']
+let confettiFrameId = 0
 
-const spawn = (side, strength = 1) => {
-  const w = confettiCanvas.value?.clientWidth || window.innerWidth
-  const h = confettiCanvas.value?.clientHeight || window.innerHeight
-  const count = Math.floor(280 * strength)
-
-  for (let i = 0; i < count; i += 1) {
-    const fromLeft = side === 'left'
-    pieces.push({
-      x: fromLeft ? rand(-60, w * 0.2) : rand(w * 0.8, w + 60),
-      y: rand(h * 0.18, h * 0.96),
-      vx: fromLeft ? rand(2.2, 6.2) : rand(-6.2, -2.2),
-      vy: rand(-6.2, -1.3),
-      size: rand(4.5, 10.8),
-      angle: rand(0, Math.PI * 2),
-      spin: rand(-0.23, 0.23),
-      color: colors[Math.floor(Math.random() * colors.length)],
-      life: rand(108, 218),
-      shape: Math.random() > 0.5 ? 'rect' : 'circle',
-    })
+const stopConfettiBurst = () => {
+  if (confettiFrameId) {
+    cancelAnimationFrame(confettiFrameId)
+    confettiFrameId = 0
   }
+  confetti.reset()
 }
 
-const triggerSideCannons = (strength = 1) => {
-  fitCanvas()
-  spawn('left', strength)
-  spawn('right', strength)
+const playConfettiBurst = ({ duration = CONFETTI_DURATION_MS, particleCount = 2 } = {}) => {
+  stopConfettiBurst()
+
+  const end = Date.now() + duration
+  const sharedOptions = {
+    particleCount,
+    spread: CONFETTI_SPREAD,
+    colors: CONFETTI_RICH_COLORS,
+    startVelocity: 60,
+    decay: 0.88,
+    scalar: 0.92,
+    zIndex: 30,
+  }
+
+  const frame = () => {
+    confetti({
+      ...sharedOptions,
+      angle: 60,
+      origin: { x: 0 },
+    })
+    confetti({
+      ...sharedOptions,
+      angle: 120,
+      origin: { x: 1 },
+    })
+
+    if (Date.now() < end) {
+      confettiFrameId = requestAnimationFrame(frame)
+      return
+    }
+
+    confettiFrameId = 0
+  }
+
+  frame()
 }
 
 const clearCheerResources = () => {
-  while (startupBurstTimers.length) {
-    const timer = startupBurstTimers.pop()
-    if (timer) clearTimeout(timer)
-  }
-
   while (cheerPopupTimers.length) {
     const timer = cheerPopupTimers.pop()
     if (timer) clearTimeout(timer)
   }
 
-  if (cheerLoopTimer) {
-    clearInterval(cheerLoopTimer)
-    cheerLoopTimer = 0
-  }
-
+  stopConfettiBurst()
   cheerPopups.value = []
 }
 
@@ -271,8 +268,9 @@ const pickCheerLine = () => {
 }
 
 const pickCheerPopupStyle = () => {
-  const left = 18 + Math.random() * 64
-  const top = 12 + Math.random() * 66
+  const compact = isCompactViewport()
+  const left = compact ? 28 + Math.random() * 44 : 18 + Math.random() * 64
+  const top = compact ? 4 + Math.random() * 34 : 12 + Math.random() * 66
   return {
     left: `${left}%`,
     top: `${top}%`,
@@ -300,90 +298,13 @@ const pushCheerPopup = () => {
   cheerPopupTimers.push(timer)
 }
 
-const restartCheerSequence = () => {
-  if (cheerLoopTimer) {
-    clearInterval(cheerLoopTimer)
-    cheerLoopTimer = 0
-  }
-
-  pieces.length = 0
-
-  let burstIndex = 0
-  triggerSideCannons(CHEER_STRENGTH)
-  burstIndex += 1
-
-  cheerLoopTimer = window.setInterval(() => {
-    if (burstIndex >= CHEER_CHAIN_BURSTS) {
-      clearInterval(cheerLoopTimer)
-      cheerLoopTimer = 0
-      return
-    }
-
-    triggerSideCannons(CHEER_STRENGTH)
-    burstIndex += 1
-  }, CHEER_CHAIN_GAP_MS)
-}
-
-const loop = () => {
-  if (!ctx || !confettiCanvas.value) return
-
-  const w = confettiCanvas.value.clientWidth
-  const h = confettiCanvas.value.clientHeight
-  ctx.clearRect(0, 0, w, h)
-
-  for (let i = pieces.length - 1; i >= 0; i -= 1) {
-    const p = pieces[i]
-    p.x += p.vx
-    p.y += p.vy
-    p.vy += 0.045
-    p.vx *= 0.996
-    p.angle += p.spin
-    p.life -= 1
-
-    ctx.save()
-    ctx.translate(p.x, p.y)
-    ctx.rotate(p.angle)
-    ctx.fillStyle = p.color
-    ctx.globalAlpha = Math.max(0.06, p.life / 220)
-    if (p.shape === 'rect') {
-      ctx.fillRect(-p.size * 0.5, -p.size * 0.22, p.size, p.size * 0.44)
-    } else {
-      ctx.beginPath()
-      ctx.arc(0, 0, p.size * 0.3, 0, Math.PI * 2)
-      ctx.fill()
-    }
-    ctx.restore()
-
-    if (p.life <= 0 || p.y > h + 24) {
-      pieces.splice(i, 1)
-    }
-  }
-
-  rafId = requestAnimationFrame(loop)
-}
-
-const fitCanvas = () => {
-  if (!confettiCanvas.value || !ctx) return
-  const dpr = Math.min(window.devicePixelRatio || 1, 1.4)
-  const w = confettiCanvas.value.clientWidth
-  const h = confettiCanvas.value.clientHeight
-  confettiCanvas.value.width = Math.floor(w * dpr)
-  confettiCanvas.value.height = Math.floor(h * dpr)
-  ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
-}
-
 const cheerUp = () => {
   pushCheerPopup()
-  restartCheerSequence()
+  playConfettiBurst()
 }
 
 const triggerStartupBurst = () => {
-  for (let i = 0; i < ENTRY_CHAIN_BURSTS; i += 1) {
-    const timer = window.setTimeout(() => {
-      triggerSideCannons(ENTRY_STRENGTH)
-    }, i * ENTRY_CHAIN_GAP_MS)
-    startupBurstTimers.push(timer)
-  }
+  playConfettiBurst()
 }
 
 const goProfile = () => {
@@ -395,12 +316,6 @@ onMounted(async () => {
   fetchDailyQuote()
   scheduleDailyQuoteRefresh()
 
-  ctx = confettiCanvas.value?.getContext('2d')
-  if (!ctx) return
-
-  rafId = requestAnimationFrame(loop)
-  window.addEventListener('resize', fitCanvas)
-
   hourTimer = window.setInterval(() => {
     currentHour.value = new Date().getHours()
   }, 60000)
@@ -411,22 +326,10 @@ onActivated(async () => {
     fetchDailyQuote({ force: true })
   }
   scheduleDailyQuoteRefresh()
-
-  if (!ctx) {
-    ctx = confettiCanvas.value?.getContext('2d')
-  }
-  if (!ctx) return
-
-  await nextTick()
-  setTimeout(() => {
-    fitCanvas()
-    triggerStartupBurst()
-  }, 100)
+  triggerStartupBurst()
 })
 
 onUnmounted(() => {
-  cancelAnimationFrame(rafId)
-  window.removeEventListener('resize', fitCanvas)
   clearCheerResources()
   if (dailyQuoteTimer) clearTimeout(dailyQuoteTimer)
   if (hourTimer) clearInterval(hourTimer)
@@ -446,6 +349,39 @@ watch(displayNickname, () => {
 
 .me-name-highlight {
   background-image: linear-gradient(135deg, var(--ai-from), var(--ai-to));
+}
+
+.me-shell {
+  padding-inline: 24px;
+}
+
+.me-hero {
+  padding-block: 10px 64px;
+}
+
+.me-title {
+  max-width: 10.5em;
+  margin: 0 auto;
+  text-wrap: balance;
+}
+
+.me-subline {
+  max-width: 12em;
+  margin-inline: auto;
+  text-wrap: balance;
+}
+
+.me-action-stack {
+  padding-bottom: 12px;
+}
+
+.me-quote-card {
+  width: min(100%, 980px);
+  margin-inline: auto;
+}
+
+.me-quote-text {
+  text-wrap: balance;
 }
 
 .avatar-orbit {
@@ -585,6 +521,27 @@ watch(displayNickname, () => {
 }
 
 @media (max-width: 960px) {
+  .me-shell {
+    padding-inline: 20px;
+  }
+
+  .me-hero {
+    padding-block: 18px 48px;
+  }
+
+  .me-title {
+    max-width: 9em;
+    font-size: clamp(34px, 8.5vw, 52px) !important;
+    line-height: 1.08;
+  }
+
+  .me-subline {
+    max-width: 10.5em;
+    margin-top: 14px;
+    font-size: clamp(22px, 6vw, 34px) !important;
+    line-height: 1.18;
+  }
+
   .avatar-orbit {
     width: 150px;
     height: 150px;
@@ -610,11 +567,94 @@ watch(displayNickname, () => {
 
   .cheer-popup-layer {
     width: min(360px, 92vw);
-    height: 250px;
+    height: 170px;
   }
 
   .cheer-popup {
     font-size: 12px;
+  }
+}
+
+@media (max-width: 640px) {
+  .me-shell {
+    padding-inline: 14px;
+  }
+
+  .me-hero {
+    padding-block: 20px 40px;
+  }
+
+  .me-title {
+    max-width: 8.2em;
+    font-size: clamp(28px, 8vw, 40px) !important;
+    line-height: 1.1;
+  }
+
+  .me-title-name {
+    display: inline-block;
+  }
+
+  .me-subline {
+    max-width: 9.4em;
+    font-size: clamp(18px, 5.8vw, 28px) !important;
+    line-height: 1.24;
+  }
+
+  .me-action-stack {
+    margin-top: 28px !important;
+    gap: 0;
+  }
+
+  .avatar-orbit {
+    width: 138px;
+    height: 138px;
+  }
+
+  .avatar-core {
+    width: 102px;
+    height: 102px;
+    font-size: 58px;
+  }
+
+  .boost-btn {
+    min-width: 0;
+    width: min(100%, 246px);
+    height: 58px;
+    margin-top: 20px !important;
+    font-size: 24px;
+    border-radius: 20px;
+  }
+
+  .profile-btn {
+    min-width: 0;
+    width: min(100%, 194px);
+    height: 44px;
+    font-size: 15px;
+  }
+
+  .cheer-popup-layer {
+    top: 10px;
+    width: min(300px, 88vw);
+    height: 132px;
+  }
+
+  .cheer-popup {
+    max-width: min(58vw, 160px);
+    padding: 6px 10px;
+    font-size: 11px;
+    line-height: 1.3;
+  }
+
+  .me-quote-card {
+    margin-top: 28px !important;
+    padding: 22px 18px !important;
+    border-radius: 28px;
+  }
+
+  .me-quote-text {
+    margin-top: 14px !important;
+    font-size: clamp(18px, 5.6vw, 30px) !important;
+    line-height: 1.18;
   }
 }
 </style>

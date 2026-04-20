@@ -296,7 +296,6 @@ const newWishCity = ref('')
 
 const wishes = ref([])
 const likingMap = reactive({})
-let pollInterval = null
 
 const commentPanelVisible = ref(false)
 const activeWishId = ref(null)
@@ -880,7 +879,8 @@ useAutoPageRefresh(async () => {
     await loadComments(activeWishId.value)
   }
 }, {
-  throttleMs: 5000,
+  throttleMs: 8000,
+  intervalMs: 15000,
 })
 
 onMounted(async () => {
@@ -890,16 +890,6 @@ onMounted(async () => {
   } catch (e) {
     alert(e.message || '星愿墙加载失败')
   }
-  pollInterval = setInterval(async () => {
-    try {
-      await fetchWishes()
-      if (activeWishId.value) {
-        await loadComments(activeWishId.value)
-      }
-    } catch (_) {
-      // keep UI stable when polling fails
-    }
-  }, 12000)
 })
 
 watch([viewportWidth, viewportHeight], () => {
@@ -908,7 +898,6 @@ watch([viewportWidth, viewportHeight], () => {
 })
 
 onUnmounted(() => {
-  if (pollInterval) clearInterval(pollInterval)
   window.removeEventListener('resize', handleResize)
 })
 </script>
