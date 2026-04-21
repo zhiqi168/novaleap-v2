@@ -80,6 +80,9 @@
           </svg>
         </button>
       </div>
+      <div class="route-progress" :class="{ 'route-progress-active': routeLoading }" aria-hidden="true">
+        <div class="route-progress-bar"></div>
+      </div>
     </header>
 
     <div v-if="mobileMenuOpen" class="mobile-mask xl:hidden" @click="mobileMenuOpen = false"></div>
@@ -153,6 +156,7 @@
 <script setup>
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import { routeLoading } from '@/router'
 import { useAuthStore } from '@/stores/auth'
 import { useUiStore } from '@/stores/ui'
 import { useAuth } from '@/composables/useAuth'
@@ -334,6 +338,32 @@ onBeforeUnmount(() => {
   z-index: 50;
   width: min(1240px, calc(100% - 20px));
   transform: translateX(-50%);
+}
+
+.route-progress {
+  pointer-events: none;
+  margin: 8px auto 0;
+  width: min(240px, calc(100% - 96px));
+  height: 3px;
+  border-radius: 999px;
+  overflow: hidden;
+  opacity: 0;
+  transform: translateY(-6px);
+  transition: opacity 0.18s ease, transform 0.18s ease;
+}
+
+.route-progress-active {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.route-progress-bar {
+  width: 42%;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, rgba(248, 154, 165, 0.32), rgba(248, 154, 165, 0.92), rgba(99, 102, 241, 0.92));
+  animation: routeProgressSlide 1s ease-in-out infinite;
+  box-shadow: 0 0 18px rgba(248, 154, 165, 0.32);
 }
 
 .floating-nav {
@@ -627,6 +657,10 @@ onBeforeUnmount(() => {
     width: calc(100% - 10px);
   }
 
+  .route-progress {
+    width: calc(100% - 72px);
+  }
+
   .floating-nav {
     grid-template-columns: auto 1fr auto;
     padding: 7px 8px;
@@ -685,5 +719,14 @@ onBeforeUnmount(() => {
 
 .dark .app-atmosphere {
   background: transparent;
+}
+
+@keyframes routeProgressSlide {
+  0% {
+    transform: translateX(-120%);
+  }
+  100% {
+    transform: translateX(340%);
+  }
 }
 </style>

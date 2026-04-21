@@ -4,6 +4,7 @@
     <!-- 背景炫彩装饰块，提供柔和的色彩层次感 -->
     <div v-if="showMediaBackground" class="absolute inset-0 z-0 overflow-hidden" :class="loginBackgroundClass">
       <video
+        v-if="shouldRenderVideoBackground"
         :src="customBackgroundVideo"
         class="h-full w-full object-cover object-center select-none"
         :class="loginBackgroundVideoClass"
@@ -11,9 +12,10 @@
         muted
         loop
         playsinline
-        preload="metadata"
+        preload="none"
         disablepictureinpicture
       ></video>
+      <div v-else class="absolute inset-0 login-bg-fallback"></div>
 
       <!-- Legacy image / overlay background branch retained for rollback reference only.
       <img
@@ -434,6 +436,7 @@ const customBackgroundVideo = '/login-backgrounds/login-loop-premium.mp4'
 // Rollback video option: /login-backgrounds/login-loop-amber.mp4
 
 const showMediaBackground = true
+const shouldRenderVideoBackground = ref(false)
 const showParticles = false
 const loginThemeClass = 'login-theme-video'
 const loginBackgroundClass = 'login-bg-video'
@@ -511,8 +514,42 @@ const currentOffset = reactive({ x: 0, y: 0 })
 
 let animationFrameId = null
 let sendCodeTimer = null
+let backgroundVideoTimer = 0
+let backgroundVideoIdleHandle = 0
 let mouseX = window.innerWidth / 2 
 let mouseY = window.innerHeight / 2
+
+const canUseRichVideoBackground = () => {
+  if (typeof window === 'undefined' || typeof navigator === 'undefined') return false
+
+  if (window.matchMedia?.('(max-width: 768px)').matches) {
+    return false
+  }
+
+  const connection = navigator.connection || navigator.mozConnection || navigator.webkitConnection
+  if (!connection) return true
+  if (connection.saveData) return false
+
+  return !['slow-2g', '2g', '3g'].includes(String(connection.effectiveType || '').toLowerCase())
+}
+
+const scheduleVideoBackgroundLoad = () => {
+  if (!showMediaBackground || !canUseRichVideoBackground()) return
+
+  const enableVideo = () => {
+    backgroundVideoTimer = window.setTimeout(() => {
+      shouldRenderVideoBackground.value = true
+      backgroundVideoTimer = 0
+    }, 900)
+  }
+
+  if (typeof window.requestIdleCallback === 'function') {
+    backgroundVideoIdleHandle = window.requestIdleCallback(enableVideo, { timeout: 1600 })
+    return
+  }
+
+  enableVideo()
+}
 
 const updateEyeTargets = () => {
   if (isPasswordFocused.value && !showPassword.value) {
@@ -649,6 +686,7 @@ const initCanvas = () => {
 
 onMounted(() => {
   if (showParticles) initCanvas()
+  scheduleVideoBackgroundLoad()
   if (turnstileSiteKey) {
     window.novaTurnstileCallback = (token) => { turnstileToken.value = token || '' }
     
@@ -673,6 +711,10 @@ onBeforeUnmount(() => {
   if (animationFrameId) cancelAnimationFrame(animationFrameId)
   if (particleAnimationFrameId) cancelAnimationFrame(particleAnimationFrameId)
   if (sendCodeTimer) clearInterval(sendCodeTimer)
+  if (backgroundVideoTimer) clearTimeout(backgroundVideoTimer)
+  if (backgroundVideoIdleHandle && typeof window.cancelIdleCallback === 'function') {
+    window.cancelIdleCallback(backgroundVideoIdleHandle)
+  }
   ctx = null
   particles.length = 0
 })
@@ -893,6 +935,14 @@ input:-webkit-autofill:active{
 .login-bg-video-media {
   filter: none;
   transform: none;
+}
+
+.login-bg-fallback {
+  background:
+    radial-gradient(circle at 18% 18%, rgba(248, 154, 165, 0.34), transparent 28%),
+    radial-gradient(circle at 82% 22%, rgba(99, 102, 241, 0.22), transparent 26%),
+    radial-gradient(circle at 32% 84%, rgba(125, 211, 252, 0.18), transparent 24%),
+    linear-gradient(135deg, #08111d 0%, #13253a 38%, #1b3248 62%, #eef4fb 100%);
 }
 
 /*

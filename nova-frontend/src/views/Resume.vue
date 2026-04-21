@@ -302,12 +302,21 @@
 
 <script setup>
 import { computed, ref, watch } from 'vue'
-import * as pdfjsLib from 'pdfjs-dist/legacy/build/pdf.mjs'
 import TypeWriter from '@/components/common/TypeWriter.vue'
 import LoadingDots from '@/components/common/LoadingDots.vue'
 import { useSSE } from '@/composables/useSSE'
 
-pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdn.jsdelivr.net/npm/pdfjs-dist@5.5.207/legacy/build/pdf.worker.min.mjs'
+let pdfjsModulePromise = null
+
+const loadPdfjs = async () => {
+  if (!pdfjsModulePromise) {
+    pdfjsModulePromise = import('pdfjs-dist/legacy/build/pdf.mjs').then((module) => {
+      module.GlobalWorkerOptions.workerSrc = 'https://cdn.jsdelivr.net/npm/pdfjs-dist@5.5.207/legacy/build/pdf.worker.min.mjs'
+      return module
+    })
+  }
+  return pdfjsModulePromise
+}
 
 const separator = '---RESUME_CONTENT_START---'
 const mobileBreakpoint = 1024
@@ -508,6 +517,7 @@ const extractTextFromPDF = async (file) => new Promise((resolve, reject) => {
 
   reader.onload = async () => {
     try {
+      const pdfjsLib = await loadPdfjs()
       const typedArray = new Uint8Array(reader.result)
       const pdf = await pdfjsLib.getDocument(typedArray).promise
       let fullText = ''
