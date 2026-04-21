@@ -237,7 +237,10 @@
                 <div class="absolute -bottom-12 left-14 h-36 w-36 rounded-full bg-cyan-200/10 blur-3xl"></div>
               </div>
               <div class="relative z-10 px-6 py-7 md:px-10 md:py-9 min-h-[52vh]">
-                <div class="prose prose-slate dark:prose-invert max-w-none text-[16px] leading-8 prose-shell">
+                <div v-if="noteDetailLoading && !activeNote.content" class="py-3">
+                  <LoadingDots />
+                </div>
+                <div v-else class="prose prose-slate dark:prose-invert max-w-none text-[16px] leading-8 prose-shell">
                   <TypeWriter :text="activeNote.content" :renderMarkdown="true" :isTyping="false" />
                 </div>
               </div>
@@ -485,6 +488,7 @@ const NOTE_DETAIL_CACHE_TTL = 10 * 60 * 1000
 
 const notes = ref([])
 const loading = ref(false)
+const noteDetailLoading = ref(false)
 const searchQuery = ref('')
 const activeNote = ref(null)
 const aiSummaries = ref([])
@@ -542,6 +546,7 @@ const applyNotesListSnapshot = (snapshot) => {
   if (!activeNote.value && notes.value.length) {
     activeNote.value = notes.value[0]
   }
+  noteDetailLoading.value = !!(activeNote.value?.id && !activeNote.value?.content)
   mobileNoteTab.value = snapshot?.mobileNoteTab || (activeNote.value ? 'detail' : 'list')
 }
 
@@ -676,6 +681,9 @@ const buildMineNotesUrl = () => {
 const hydrateNoteDetail = async (noteId, options = {}) => {
   const { force = false } = options
   if (!noteId) return
+  if (Number(activeNote.value?.id || 0) === Number(noteId)) {
+    noteDetailLoading.value = !activeNote.value?.content || force
+  }
   if (!force) {
     const cached = resourceCacheStore.readDetail(NOTE_RUNTIME_NAMESPACE, noteId, NOTE_DETAIL_CACHE_TTL)
     if (cached) {
@@ -684,6 +692,9 @@ const hydrateNoteDetail = async (noteId, options = {}) => {
       activeNote.value = detail
       patchNoteInList(detail)
       persistNoteDetailSnapshot(detail)
+      if (Number(activeNote.value?.id || 0) === Number(noteId)) {
+        noteDetailLoading.value = false
+      }
       return
     }
   }
@@ -706,6 +717,10 @@ const hydrateNoteDetail = async (noteId, options = {}) => {
     persistNoteDetailSnapshot(detail)
   } catch (_) {
     // noop
+  } finally {
+    if (Number(activeNote.value?.id || 0) === Number(noteId)) {
+      noteDetailLoading.value = false
+    }
   }
 }
 
@@ -720,6 +735,7 @@ const applyNotesPayload = (payload) => {
     }
   } else if (!notes.value.length) {
     activeNote.value = null
+    noteDetailLoading.value = false
   }
 
   if (isNotesMobileViewport()) {
@@ -1053,6 +1069,7 @@ const selectNote = (note) => {
   const isCurrentSelected = String(activeNote.value?.id ?? '') === String(note?.id ?? '')
   activeNote.value = applyLocalNoteViewFloor(note)
   persistNoteDetailSnapshot(activeNote.value)
+  noteDetailLoading.value = !activeNote.value?.content
   aiSummaries.value = []
   isAiGenerating.value = false
   if (isNotesMobileViewport()) {
@@ -1093,8 +1110,15 @@ const selectNote = (note) => {
       activeNote.value = detail
       patchNoteInList(detail)
       persistNoteDetailSnapshot(detail)
+      if (Number(activeNote.value?.id || 0) === Number(detail.id || 0)) {
+        noteDetailLoading.value = false
+      }
     })
-    .catch(() => {})
+    .catch(() => {
+      if (Number(activeNote.value?.id || 0) === Number(note?.id || 0)) {
+        noteDetailLoading.value = false
+      }
+    })
 }
 
 const generateSummary = async () => {

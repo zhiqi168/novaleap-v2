@@ -48,6 +48,11 @@ export const useResourceCacheStore = defineStore('resource-cache', {
     invalidateLists(namespace) {
       readBucket(this.$state, namespace).lists = {}
     },
+    invalidateNamespace(namespace) {
+      const bucket = readBucket(this.$state, namespace)
+      bucket.lists = {}
+      bucket.details = {}
+    },
     readDetail(namespace, id, ttlMs = 0) {
       const entry = readBucket(this.$state, namespace).details[id]
       if (!entry) return null

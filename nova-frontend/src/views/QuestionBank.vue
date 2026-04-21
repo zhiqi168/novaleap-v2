@@ -348,7 +348,7 @@
             <div class="text-sm font-semibold text-text-primary">参考答案</div>
             <button
               class="workspace-btn workspace-btn-muted text-xs px-2.5 py-1 rounded-lg border border-black/10 bg-white hover:bg-black/[0.03]"
-              @click="loadDbAnswer(activeQuestion.id)"
+              @click="loadDbAnswer(activeQuestion.id, { preserveExisting: false, force: true })"
               :disabled="dbAnswerLoading"
             >
               {{ dbAnswerLoading ? '读取中...' : '刷新答案' }}
@@ -358,7 +358,7 @@
             </span>
           </div>
           <div class="answer-body">
-            <div v-if="dbAnswerLoading" class="py-3"><LoadingDots /></div>
+            <div v-if="dbAnswerLoading && !dbAnswer" class="py-3"><LoadingDots /></div>
             <div v-else class="prose prose-sm max-w-none text-text-secondary">
               <TypeWriter :text="dbAnswer || '当前题目尚未配置参考答案'" :renderMarkdown="true" :isTyping="false" />
             </div>
@@ -594,9 +594,10 @@ import { useResourceCacheStore } from '@/stores/resourceCache'
 const authStore = useAuthStore()
 const resourceCacheStore = useResourceCacheStore()
 const QUESTION_RUNTIME_NAMESPACE = 'question-bank'
+const QUESTION_ANSWER_NAMESPACE = 'question-bank-answer'
 const QUESTION_META_NAMESPACE = 'question-bank-meta'
 const QUESTION_LIST_CACHE_TTL = 2 * 60 * 1000
-const QUESTION_DETAIL_CACHE_TTL = 10 * 60 * 1000
+const QUESTION_ANSWER_CACHE_TTL = 30 * 60 * 1000
 const QUESTION_CATEGORY_CACHE_TTL = 30 * 60 * 1000
 const QUESTION_BANK_CACHE_TTL = 60 * 1000
 const {
@@ -698,6 +699,33 @@ const persistQuestionDetailSnapshot = (question = activeQuestion.value) => {
   const qid = Number(question?.id || 0)
   if (!qid) return
   resourceCacheStore.writeDetail(QUESTION_RUNTIME_NAMESPACE, qid, { ...question })
+}
+
+const normalizeQuestionRecord = (question) => ({
+  ...question,
+  category: normalizeCategoryCode(question?.category),
+  tags: Array.isArray(question?.tags)
+    ? [...question.tags]
+    : (typeof question?.tags === 'string'
+        ? question.tags.split(',').map((item) => item.trim()).filter(Boolean)
+        : []),
+})
+
+const readCachedQuestionAnswerSnapshot = (questionId) => {
+  const qid = Number(questionId || 0)
+  if (!Number.isInteger(qid) || qid <= 0) return null
+  return resourceCacheStore.readDetail(QUESTION_ANSWER_NAMESPACE, qid, QUESTION_ANSWER_CACHE_TTL)
+}
+
+const writeCachedQuestionAnswerSnapshot = (questionId, snapshot) => {
+  const qid = Number(questionId || 0)
+  if (!Number.isInteger(qid) || qid <= 0 || !snapshot) return
+  resourceCacheStore.writeDetail(QUESTION_ANSWER_NAMESPACE, qid, snapshot)
+}
+
+const applyQuestionAnswerSnapshot = (snapshot) => {
+  dbAnswer.value = sanitizeOfficialAnswer(snapshot?.answer || '')
+  dbAnswerSource.value = String(snapshot?.source || '').trim()
 }
 
 const uploadDialogVisible = ref(false)
@@ -1191,11 +1219,7 @@ const fetchQuestions = async (page = currentPage.value, options = {}) => {
           throw new Error(res.msg || '加载题库失败')
         }
         return {
-          records: (res.data?.records || []).map((q) => ({
-            ...q,
-            category: normalizeCategoryCode(q?.category),
-            tags: typeof q.tags === 'string' ? q.tags.split(',').map((t) => t.trim()).filter(Boolean) : [],
-          })).map(applyQuestionViewFloor),
+          records: (res.data?.records || []).map(normalizeQuestionRecord).map(applyQuestionViewFloor),
           currentPage: Number(page || 1),
           totalPages: Math.max(1, Number(res.data?.pages || 1)),
           totalQuestions: Math.max(0, Number(res.data?.total || 0)),
@@ -1240,64 +1264,42 @@ const selectBank = (bank) => {
 
 let latestAnswerRequestId = 0
 
-const hydrateQuestionDetail = async (questionId, fallbackQuestion = null) => {
+const prefetchQuestionAnswer = async (questionId, options = {}) => {
+  const { force = false } = options
   const qid = Number(questionId || 0)
-  if (!Number.isInteger(qid) || qid <= 0) {
-    activeQuestion.value = fallbackQuestion || null
-    return
-  }
-  const cachedDetail = resourceCacheStore.readDetail(QUESTION_RUNTIME_NAMESPACE, qid, QUESTION_DETAIL_CACHE_TTL)
-  if (cachedDetail) {
-    const latestListQuestion = questions.value.find((item) => Number(item?.id || 0) === qid)
-    const mergedViewCount = Math.max(
-      Number(cachedDetail.viewCount || 0),
-      Number(latestListQuestion?.viewCount || 0),
-      Number(fallbackQuestion?.viewCount || 0),
-      Number(activeQuestion.value?.id || 0) === qid ? Number(activeQuestion.value?.viewCount || 0) : 0,
-    )
-    activeQuestion.value = applyQuestionViewFloor({
-      ...cachedDetail,
-      viewCount: Number.isFinite(mergedViewCount) ? mergedViewCount : Number(cachedDetail.viewCount || 0),
-    })
-    rememberQuestionViewCount(qid, activeQuestion.value.viewCount)
-    return
-  }
+  if (!Number.isInteger(qid) || qid <= 0) return null
   try {
-    const detail = await resourceCacheStore.loadDetail(
-      QUESTION_RUNTIME_NAMESPACE,
+    const snapshot = await resourceCacheStore.loadDetail(
+      QUESTION_ANSWER_NAMESPACE,
       qid,
       async () => {
-        const res = await api.get(`/api/questions/${qid}`)
+        const res = await api.get(`/api/questions/${qid}/answer`)
         if (res.code !== 200 || !res.data) {
-          throw new Error(res.msg || '加载题目详情失败')
+          throw new Error(res.msg || '加载题目答案失败')
         }
         return {
-          ...res.data,
-          tags: typeof res.data.tags === 'string' ? res.data.tags.split(',').map((t) => t.trim()).filter(Boolean) : [],
+          id: qid,
+          answer: sanitizeOfficialAnswer(res.data.answer),
+          source: res.data.source || '',
         }
       },
-      { ttlMs: QUESTION_DETAIL_CACHE_TTL },
+      { ttlMs: QUESTION_ANSWER_CACHE_TTL, force },
     )
-    const latestListQuestion = questions.value.find((item) => Number(item?.id || 0) === qid)
-    const mergedViewCount = Math.max(
-      Number(detail.viewCount || 0),
-      Number(latestListQuestion?.viewCount || 0),
-      Number(fallbackQuestion?.viewCount || 0),
-      Number(activeQuestion.value?.id || 0) === qid ? Number(activeQuestion.value?.viewCount || 0) : 0,
-    )
-    activeQuestion.value = applyQuestionViewFloor({
-      ...detail,
-      viewCount: Number.isFinite(mergedViewCount) ? mergedViewCount : Number(detail.viewCount || 0),
-    })
-    rememberQuestionViewCount(qid, activeQuestion.value.viewCount)
-    persistQuestionDetailSnapshot(activeQuestion.value)
-    return
+    writeCachedQuestionAnswerSnapshot(qid, snapshot)
+    return snapshot
   } catch (_) {
-    // fall back to list payload
+    return null
   }
-  const latestListQuestion = questions.value.find((item) => Number(item?.id || 0) === qid)
-  activeQuestion.value = applyQuestionViewFloor(latestListQuestion || fallbackQuestion || null)
-  persistQuestionDetailSnapshot(activeQuestion.value)
+}
+
+const warmQuestionAnswers = (questionRows = []) => {
+  const ids = questionRows
+    .map((item) => Number(item?.id || 0))
+    .filter((qid, index, arr) => Number.isInteger(qid) && qid > 0 && arr.indexOf(qid) === index)
+    .slice(0, 2)
+  for (const qid of ids) {
+    void prefetchQuestionAnswer(qid)
+  }
 }
 
 const syncActiveQuestionAfterListLoaded = () => {
@@ -1318,6 +1320,10 @@ const syncActiveQuestionAfterListLoaded = () => {
       tags: matched.tags,
     }
     persistQuestionDetailSnapshot(activeQuestion.value)
+    if (!dbAnswer.value && !dbAnswerLoading.value) {
+      void loadDbAnswer(activeId, { preserveExisting: true })
+    }
+    warmQuestionAnswers([matched, ...questions.value.filter((item) => Number(item?.id || 0) !== activeId)])
     return
   }
 
@@ -1327,20 +1333,18 @@ const syncActiveQuestionAfterListLoaded = () => {
   clearAnswerPanels()
   const firstQuestionId = Number(firstQuestion?.id || 0)
   if (firstQuestionId > 0) {
-    void hydrateQuestionDetail(firstQuestionId, firstQuestion)
     void loadDbAnswer(firstQuestionId, { preserveExisting: false })
+    warmQuestionAnswers(questions.value)
   }
 }
 
 const openQuestion = async (question) => {
-  const qid = Number(question?.id || 0)
+  const nextQuestion = applyQuestionViewFloor(normalizeQuestionRecord(question || {}))
+  const qid = Number(nextQuestion?.id || 0)
   const isSameQuestion = qid > 0 && Number(activeQuestion.value?.id || 0) === qid
   if (isSameQuestion) {
-    if (!activeQuestion.value?.content) {
-      await hydrateQuestionDetail(qid, question)
-    }
     if (!dbAnswer.value && !dbAnswerLoading.value) {
-      loadDbAnswer(qid, { preserveExisting: true })
+      void loadDbAnswer(qid, { preserveExisting: true })
     }
     const latest = questions.value.find((item) => Number(item?.id || 0) === qid)
     if (latest && activeQuestion.value) {
@@ -1356,26 +1360,42 @@ const openQuestion = async (question) => {
   }
 
   clearAnswerPanels()
-  await hydrateQuestionDetail(qid, question)
+  activeQuestion.value = nextQuestion
+  persistQuestionDetailSnapshot(activeQuestion.value)
   void markQuestionViewed(qid)
   if (window.innerWidth < 768) {
     mobileTab.value = 'detail'
   }
-  loadDbAnswer(qid, { preserveExisting: false })
+  void loadDbAnswer(qid, { preserveExisting: false })
+  warmQuestionAnswers([nextQuestion, ...questions.value.filter((item) => Number(item?.id || 0) !== qid)])
 }
 
 const loadDbAnswer = async (questionId, options = {}) => {
-  const { preserveExisting = true } = options
+  const { preserveExisting = true, force = false } = options
+  const qid = Number(questionId || 0)
+  if (!Number.isInteger(qid) || qid <= 0) return
   const reqId = ++latestAnswerRequestId
   const previousAnswer = dbAnswer.value
   const previousSource = dbAnswerSource.value
+  if (!force) {
+    const cached = readCachedQuestionAnswerSnapshot(qid)
+    if (cached) {
+      if (reqId !== latestAnswerRequestId) return
+      applyQuestionAnswerSnapshot(cached)
+      dbAnswerLoading.value = false
+      return
+    }
+  }
+  if (!preserveExisting) {
+    dbAnswer.value = ''
+    dbAnswerSource.value = ''
+  }
   dbAnswerLoading.value = true
   try {
-    const res = await api.get(`/api/questions/${questionId}/answer`)
+    const snapshot = await prefetchQuestionAnswer(qid, { force })
     if (reqId !== latestAnswerRequestId) return
-    if (res.code === 200 && res.data) {
-      dbAnswer.value = sanitizeOfficialAnswer(res.data.answer)
-      dbAnswerSource.value = res.data.source || (currentBank.value ? currentBank.value.name : '官方题库')
+    if (snapshot) {
+      applyQuestionAnswerSnapshot(snapshot)
       return
     }
     if (preserveExisting) {
@@ -1615,8 +1635,9 @@ const submitImport = async () => {
     }
 
     closeImportDialog()
-    resourceCacheStore.invalidateLists(QUESTION_META_NAMESPACE)
-    resourceCacheStore.invalidateLists(QUESTION_RUNTIME_NAMESPACE)
+    resourceCacheStore.invalidateNamespace(QUESTION_META_NAMESPACE)
+    resourceCacheStore.invalidateNamespace(QUESTION_RUNTIME_NAMESPACE)
+    resourceCacheStore.invalidateNamespace(QUESTION_ANSWER_NAMESPACE)
     await fetchCustomBanks({ force: true })
     if (res.data?.id) {
       currentBankId.value = res.data.id
@@ -1683,7 +1704,8 @@ const submitRename = async () => {
       throw new Error(res.msg || '重命名失败')
     }
     closeRenameDialog()
-    resourceCacheStore.invalidateLists(QUESTION_META_NAMESPACE)
+    resourceCacheStore.invalidateNamespace(QUESTION_META_NAMESPACE)
+    resourceCacheStore.invalidateNamespace(QUESTION_ANSWER_NAMESPACE)
     await fetchCustomBanks({ force: true })
   } catch (e) {
     alert(e.message || '重命名失败')
