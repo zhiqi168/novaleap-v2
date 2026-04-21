@@ -1,6 +1,7 @@
 import { ref } from 'vue'
 
 const BASE_URL = String(import.meta.env.VITE_API_BASE_URL || '').trim().replace(/\/+$/, '')
+const DEFAULT_TIMEOUT_MS = 12000
 
 function normalizeUrl(url) {
   const raw = String(url || '').trim()
@@ -12,6 +13,7 @@ function normalizeUrl(url) {
 }
 
 const readToken = () => sessionStorage.getItem('nova_token') || localStorage.getItem('nova_token')
+
 const clearAuthStorage = () => {
   sessionStorage.removeItem('nova_token')
   sessionStorage.removeItem('nova_user')
@@ -19,13 +21,43 @@ const clearAuthStorage = () => {
   localStorage.removeItem('nova_user')
 }
 
-async function request(url, options = {}) {
-  const token = readToken()
-  const isFormData = options.body instanceof FormData
+const sleep = (ms) => new Promise((resolve) => window.setTimeout(resolve, ms))
 
+function isRetryableStatus(status) {
+  return [408, 429, 502, 503, 504].includes(Number(status))
+}
+
+function createTimeoutError(timeoutMs) {
+  const error = new Error(`请求超时（>${Math.ceil(Number(timeoutMs || DEFAULT_TIMEOUT_MS) / 1000)}s）`)
+  error.name = 'TimeoutError'
+  error.retryable = true
+  return error
+}
+
+function isRetryableNetworkError(error) {
+  if (!error) return false
+  if (error.name === 'TimeoutError') return true
+  const message = String(error.message || '').toLowerCase()
+  return message.includes('failed to fetch')
+    || message.includes('networkerror')
+    || message.includes('load failed')
+    || message.includes('fetch failed')
+}
+
+async function request(url, options = {}) {
+  const {
+    timeoutMs = DEFAULT_TIMEOUT_MS,
+    retryCount = 0,
+    retryDelayMs = 500,
+    ...fetchOptions
+  } = options
+
+  const token = readToken()
+  const isFormData = fetchOptions.body instanceof FormData
   const headers = {
-    ...options.headers,
+    ...fetchOptions.headers,
   }
+
   if (!isFormData) {
     headers['Content-Type'] = headers['Content-Type'] || 'application/json'
   }
@@ -34,24 +66,58 @@ async function request(url, options = {}) {
     headers.Authorization = `Bearer ${token}`
   }
 
-  const response = await fetch(`${BASE_URL}${normalizeUrl(url)}`, {
-    ...options,
-    headers,
-    body: options.body
-      ? (isFormData ? options.body : JSON.stringify(options.body))
-      : undefined,
-  })
+  const targetUrl = `${BASE_URL}${normalizeUrl(url)}`
+  let lastError = null
 
-  if (!response.ok) {
-    if (response.status === 401) {
-      clearAuthStorage()
-      window.location.href = '/login'
+  for (let attempt = 0; attempt <= retryCount; attempt += 1) {
+    const controller = new AbortController()
+    const timeoutId = window.setTimeout(() => controller.abort(createTimeoutError(timeoutMs)), timeoutMs)
+
+    try {
+      const response = await fetch(targetUrl, {
+        ...fetchOptions,
+        headers,
+        signal: controller.signal,
+        body: fetchOptions.body
+          ? (isFormData ? fetchOptions.body : JSON.stringify(fetchOptions.body))
+          : undefined,
+      })
+
+      if (!response.ok) {
+        if (response.status === 401) {
+          clearAuthStorage()
+          window.location.href = '/login'
+        }
+        const errorData = await response.json().catch(() => ({}))
+        const error = new Error(errorData.msg || `请求失败: HTTP ${response.status}`)
+        error.status = response.status
+        error.retryable = isRetryableStatus(response.status)
+        throw error
+      }
+
+      return response.json()
+    } catch (error) {
+      if (error?.name === 'AbortError') {
+        lastError = error?.cause instanceof Error ? error.cause : createTimeoutError(timeoutMs)
+      } else {
+        lastError = error
+      }
+
+      const canRetry = attempt < retryCount && (
+        lastError?.retryable === true || isRetryableNetworkError(lastError)
+      )
+
+      if (!canRetry) {
+        throw lastError
+      }
+
+      await sleep(retryDelayMs * (attempt + 1))
+    } finally {
+      window.clearTimeout(timeoutId)
     }
-    const errorData = await response.json().catch(() => ({}))
-    throw new Error(errorData.msg || `请求失败: HTTP ${response.status}`)
   }
 
-  return response.json()
+  throw lastError || new Error('请求失败')
 }
 
 export function useRequest(apiFn) {
@@ -83,8 +149,8 @@ export function useRequest(apiFn) {
 
 export const api = {
   get: (url, options = {}) => request(url, { method: 'GET', ...options }),
-  post: (url, body) => request(url, { method: 'POST', body }),
-  put: (url, body) => request(url, { method: 'PUT', body }),
-  delete: (url) => request(url, { method: 'DELETE' }),
-  upload: (url, formData) => request(url, { method: 'POST', body: formData }),
+  post: (url, body, options = {}) => request(url, { method: 'POST', body, ...options }),
+  put: (url, body, options = {}) => request(url, { method: 'PUT', body, ...options }),
+  delete: (url, options = {}) => request(url, { method: 'DELETE', ...options }),
+  upload: (url, formData, options = {}) => request(url, { method: 'POST', body: formData, ...options }),
 }

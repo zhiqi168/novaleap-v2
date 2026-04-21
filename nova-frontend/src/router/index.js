@@ -128,7 +128,7 @@ const routes = [
         path: 'questions',
         name: 'QuestionBank',
         component: QuestionBankView,
-        meta: { title: '掘光题库 - NovaLeap' },
+        meta: { title: '拾光题库 - NovaLeap' },
       },
       {
         path: 'notes',

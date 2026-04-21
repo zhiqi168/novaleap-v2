@@ -483,8 +483,11 @@ import { useResourceCacheStore } from '@/stores/resourceCache'
 const authStore = useAuthStore()
 const resourceCacheStore = useResourceCacheStore()
 const NOTE_RUNTIME_NAMESPACE = 'notes'
+const NOTE_AI_SUMMARY_NAMESPACE = 'notes-ai-summary'
 const NOTE_LIST_CACHE_TTL = 2 * 60 * 1000
 const NOTE_DETAIL_CACHE_TTL = 10 * 60 * 1000
+const NOTE_AI_SUMMARY_CACHE_TTL = 30 * 60 * 1000
+const NOTE_AI_SUMMARY_TIMEOUT_MS = 4500
 
 const notes = ref([])
 const loading = ref(false)
@@ -558,6 +561,60 @@ const persistNoteDetailSnapshot = (note = activeNote.value) => {
   const noteId = Number(note?.id || 0)
   if (!noteId) return
   resourceCacheStore.writeDetail(NOTE_RUNTIME_NAMESPACE, noteId, { ...note })
+}
+
+const readCachedAiSummary = (noteId) => {
+  const id = Number(noteId || 0)
+  if (!id) return []
+  const snapshot = resourceCacheStore.readDetail(NOTE_AI_SUMMARY_NAMESPACE, id, NOTE_AI_SUMMARY_CACHE_TTL)
+  return Array.isArray(snapshot?.items)
+    ? snapshot.items.filter((item) => typeof item === 'string' && item.trim())
+    : []
+}
+
+const writeCachedAiSummary = (noteId, items = []) => {
+  const id = Number(noteId || 0)
+  const normalized = Array.isArray(items)
+    ? items.map((item) => String(item || '').trim()).filter(Boolean)
+    : []
+  if (!id || !normalized.length) return
+  resourceCacheStore.writeDetail(NOTE_AI_SUMMARY_NAMESPACE, id, {
+    items: normalized,
+  })
+}
+
+const buildQuickSummaryPoints = (note) => {
+  const title = String(note?.title || '').trim()
+  const summary = String(note?.summary || '').trim()
+  const content = String(note?.content || '').trim()
+  const seed = [summary, content].filter(Boolean).join('\n')
+  const segments = seed
+    .split(/[\r\n]+|(?<=[。！？!?；;])/)
+    .map((item) => item.replace(/\s+/g, ' ').trim())
+    .filter(Boolean)
+
+  const points = []
+  if (title) {
+    points.push(`这篇内容围绕“${title}”展开，先看作者给出的实际经验和结论。`)
+  }
+
+  for (const segment of segments) {
+    const normalized = segment.replace(/^[-*•\d.\s]+/, '').trim()
+    if (!normalized) continue
+    if (points.some((item) => item.includes(normalized) || normalized.includes(item))) continue
+    points.push(normalized.length > 72 ? `${normalized.slice(0, 72)}...` : normalized)
+    if (points.length >= 3) break
+  }
+
+  if (!points.length && title) {
+    points.push(`这篇内容重点在“${title}”，可以先结合正文里的案例和结论快速浏览。`)
+  }
+
+  if (!points.length) {
+    points.push('正文已加载完成，但线上 AI 摘要暂时不可用，建议先直接阅读正文重点段落。')
+  }
+
+  return points.slice(0, 3)
 }
 
 const touchState = reactive({
@@ -1070,7 +1127,7 @@ const selectNote = (note) => {
   activeNote.value = applyLocalNoteViewFloor(note)
   persistNoteDetailSnapshot(activeNote.value)
   noteDetailLoading.value = !activeNote.value?.content
-  aiSummaries.value = []
+  aiSummaries.value = readCachedAiSummary(activeNote.value?.id)
   isAiGenerating.value = false
   if (isNotesMobileViewport()) {
     mobileNoteTab.value = 'detail'
@@ -1123,12 +1180,21 @@ const selectNote = (note) => {
 
 const generateSummary = async () => {
   if (!activeNote.value) return
+  const noteId = Number(activeNote.value.id || 0)
+  const cachedSummary = readCachedAiSummary(noteId)
+  if (cachedSummary.length) {
+    aiSummaries.value = cachedSummary
+    return
+  }
   isAiGenerating.value = true
   aiSummaries.value = []
   try {
     const res = await api.post('/api/ai/notes/summarize', {
       title: activeNote.value.title,
       content: activeNote.value.content,
+    }, {
+      timeoutMs: NOTE_AI_SUMMARY_TIMEOUT_MS,
+      retryCount: 0,
     })
     if (res.code !== 200) {
       throw new Error(res.msg || 'AI 摘要生成失败')
@@ -1137,10 +1203,12 @@ const generateSummary = async () => {
       ? res.data.filter((item) => typeof item === 'string' && item.trim())
       : []
     if (!aiSummaries.value.length) {
-      throw new Error('AI 未返回有效摘要')
+      aiSummaries.value = buildQuickSummaryPoints(activeNote.value)
     }
+    writeCachedAiSummary(noteId, aiSummaries.value)
   } catch (e) {
-    alert(e.message || 'AI 摘要生成失败，请稍后重试。')
+    aiSummaries.value = buildQuickSummaryPoints(activeNote.value)
+    writeCachedAiSummary(noteId, aiSummaries.value)
   } finally {
     isAiGenerating.value = false
   }

@@ -359,8 +359,11 @@
           </div>
           <div class="answer-body">
             <div v-if="dbAnswerLoading && !dbAnswer" class="py-3"><LoadingDots /></div>
+            <p v-if="dbAnswerLoading && dbAnswerSlow" class="mb-3 text-xs text-amber-700 bg-amber-50 border border-amber-100 rounded-xl px-3 py-2">
+              参考答案接口正在变慢，线上环境可能在排队或波动中。
+            </p>
             <div v-else class="prose prose-sm max-w-none text-text-secondary">
-              <TypeWriter :text="dbAnswer || '当前题目尚未配置参考答案'" :renderMarkdown="true" :isTyping="false" />
+              <TypeWriter :text="answerDisplayText" :renderMarkdown="true" :isTyping="false" />
             </div>
           </div>
         </article>
@@ -380,7 +383,7 @@
             <TypeWriter :text="aiContent || ''" :renderMarkdown="true" :isTyping="aiStreaming" />
             <div v-if="aiStreaming && !aiContent" class="py-2"><LoadingDots /></div>
           </div>
-          <p v-if="safeAiError" class="mt-2 text-xs text-danger">AI 请求失败：{{ safeAiError }}</p>
+          <p v-if="safeAiErrorText" class="mt-2 text-xs text-danger">AI 请求失败：{{ safeAiErrorText }}</p>
         </article>
 
         <p v-if="doneTip" class="mt-3 text-xs text-emerald-700">{{ doneTip }}</p>
@@ -600,6 +603,10 @@ const QUESTION_LIST_CACHE_TTL = 2 * 60 * 1000
 const QUESTION_ANSWER_CACHE_TTL = 30 * 60 * 1000
 const QUESTION_CATEGORY_CACHE_TTL = 30 * 60 * 1000
 const QUESTION_BANK_CACHE_TTL = 60 * 1000
+const QUESTION_ANSWER_TIMEOUT_MS = 2500
+const QUESTION_ANSWER_SLOW_MS = 1200
+const AI_EXPLAIN_TIMEOUT_MS = 20000
+const AI_EXPLAIN_FIRST_CHUNK_TIMEOUT_MS = 5000
 const {
   content: aiContent,
   isStreaming: aiStreaming,
@@ -659,6 +666,7 @@ const questionViewFloorMap = ref(new Map())
 const dbAnswer = ref('')
 const dbAnswerSource = ref('')
 const dbAnswerLoading = ref(false)
+const dbAnswerSlow = ref(false)
 const bankPanelCollapsed = ref(true)
 
 const customBanks = ref([])
@@ -777,6 +785,25 @@ const listEmptyTip = computed(() => {
       : '该题库暂未通过审核，请修改后重新上传。'
   }
   return '当前条件下暂无题目'
+})
+
+const safeAiErrorText = computed(() => {
+  const raw = String(safeAiError.value || '').trim()
+  if (!raw) return ''
+  if (/failed to fetch|networkerror|load failed|fetch failed/i.test(raw)) {
+    return 'AI 服务连接失败，通常是线上网关或后端 AI 服务暂时不可用，请稍后重试。'
+  }
+  if (/timeout|timed out|超时/i.test(raw)) {
+    return 'AI 服务响应超时，线上链路偏慢时会出现这个提示，请稍后重试。'
+  }
+  return raw
+})
+const answerDisplayText = computed(() => {
+  if (dbAnswer.value) return dbAnswer.value
+  if (dbAnswerSlow.value) {
+    return '参考答案加载较慢，线上接口可能正在波动。你可以稍后点击“刷新答案”重试。'
+  }
+  return '当前题目尚未配置参考答案'
 })
 
 const categoryLabel = (category) => {
@@ -918,6 +945,7 @@ const syncCategorySelectionAfterOptionsLoaded = () => {
 const clearAnswerPanels = () => {
   dbAnswer.value = ''
   dbAnswerSource.value = ''
+  dbAnswerSlow.value = false
   doneTip.value = ''
   aiStarted.value = false
   resetAi()
@@ -1273,7 +1301,10 @@ const prefetchQuestionAnswer = async (questionId, options = {}) => {
       QUESTION_ANSWER_NAMESPACE,
       qid,
       async () => {
-        const res = await api.get(`/api/questions/${qid}/answer`)
+        const res = await api.get(`/api/questions/${qid}/answer`, {
+          timeoutMs: QUESTION_ANSWER_TIMEOUT_MS,
+          retryCount: 0,
+        })
         if (res.code !== 200 || !res.data) {
           throw new Error(res.msg || '加载题目答案失败')
         }
@@ -1293,10 +1324,13 @@ const prefetchQuestionAnswer = async (questionId, options = {}) => {
 }
 
 const warmQuestionAnswers = (questionRows = []) => {
+  const connection = navigator.connection || navigator.mozConnection || navigator.webkitConnection
+  if (connection?.saveData) return
+  if (/(^|[^a-z])(slow-?2g|2g)($|[^a-z])/i.test(String(connection?.effectiveType || ''))) return
   const ids = questionRows
     .map((item) => Number(item?.id || 0))
     .filter((qid, index, arr) => Number.isInteger(qid) && qid > 0 && arr.indexOf(qid) === index)
-    .slice(0, 2)
+    .slice(0, 1)
   for (const qid of ids) {
     void prefetchQuestionAnswer(qid)
   }
@@ -1377,12 +1411,14 @@ const loadDbAnswer = async (questionId, options = {}) => {
   const reqId = ++latestAnswerRequestId
   const previousAnswer = dbAnswer.value
   const previousSource = dbAnswerSource.value
+  let slowTimer = 0
   if (!force) {
     const cached = readCachedQuestionAnswerSnapshot(qid)
     if (cached) {
       if (reqId !== latestAnswerRequestId) return
       applyQuestionAnswerSnapshot(cached)
       dbAnswerLoading.value = false
+      dbAnswerSlow.value = false
       return
     }
   }
@@ -1390,31 +1426,45 @@ const loadDbAnswer = async (questionId, options = {}) => {
     dbAnswer.value = ''
     dbAnswerSource.value = ''
   }
+  dbAnswerSlow.value = false
   dbAnswerLoading.value = true
+  slowTimer = window.setTimeout(() => {
+    if (reqId === latestAnswerRequestId && dbAnswerLoading.value) {
+      dbAnswerSlow.value = true
+    }
+  }, QUESTION_ANSWER_SLOW_MS)
   try {
     const snapshot = await prefetchQuestionAnswer(qid, { force })
     if (reqId !== latestAnswerRequestId) return
     if (snapshot) {
       applyQuestionAnswerSnapshot(snapshot)
+      dbAnswerSlow.value = false
       return
     }
     if (preserveExisting) {
       dbAnswer.value = previousAnswer
       dbAnswerSource.value = previousSource
+      dbAnswerSlow.value = false
       return
     }
     dbAnswer.value = ''
     dbAnswerSource.value = ''
+    dbAnswerSlow.value = true
   } catch (_) {
     if (reqId !== latestAnswerRequestId) return
     if (preserveExisting) {
       dbAnswer.value = previousAnswer
       dbAnswerSource.value = previousSource
+      dbAnswerSlow.value = false
       return
     }
     dbAnswer.value = ''
     dbAnswerSource.value = ''
+    dbAnswerSlow.value = true
   } finally {
+    if (slowTimer) {
+      window.clearTimeout(slowTimer)
+    }
     if (reqId === latestAnswerRequestId) {
       dbAnswerLoading.value = false
     }
@@ -1571,7 +1621,11 @@ const startAiExplanation = async () => {
   if (!activeQuestion.value?.id) return
   aiStarted.value = true
   resetAi()
-  await startStream(`/api/ai/question/${activeQuestion.value.id}/explain`)
+  await startStream(`/api/ai/question/${activeQuestion.value.id}/explain`, {
+    timeoutMs: AI_EXPLAIN_TIMEOUT_MS,
+    firstChunkTimeoutMs: AI_EXPLAIN_FIRST_CHUNK_TIMEOUT_MS,
+    retryCount: 1,
+  })
 }
 
 const resetImportForm = () => {
@@ -1736,13 +1790,15 @@ const handleWindowResize = () => {
 }
 
 const refreshQuestionBankData = async () => {
-  await Promise.all([
-    fetchCategoryOptions(),
+  const bootstrapTasks = [
+    fetchCategoryOptions().then(() => {
+      syncCategoryToSelectedBank()
+    }),
     fetchCustomBanks(),
     loadDoneFromServer(),
-  ])
-  syncCategoryToSelectedBank()
+  ]
   await fetchQuestions(currentPage.value || 1)
+  await Promise.allSettled(bootstrapTasks)
 }
 
 onMounted(async () => {
