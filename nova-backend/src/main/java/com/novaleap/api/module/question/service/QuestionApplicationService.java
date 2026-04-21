@@ -146,6 +146,16 @@ public class QuestionApplicationService {
             return cached;
         }
 
+        String customScope = resolveCustomQuestionScope(authentication);
+        if (customScope != null) {
+            QuestionDetailVO customCached = questionReadCacheSupport.readScopedCustomQuestionDetail(customScope, id);
+            if (customCached != null) {
+                customCached.setViewCount(questionReadCacheSupport.resolveOfficialQuestionViewCount(id, customCached.getViewCount()));
+                log.info("[perf][question-detail] cache-hit-custom id={} scope={} tookMs={}", id, customScope, elapsedMs(startNs));
+                return customCached;
+            }
+        }
+
         String lockToken = questionReadCacheSupport.tryLockOfficialQuestionDetail(id);
         if (lockToken == null) {
             QuestionDetailVO waitedCache = waitForOfficialQuestionDetailCache(id);
@@ -176,6 +186,9 @@ public class QuestionApplicationService {
             if (isOfficialQuestion(question)) {
                 questionReadCacheSupport.writeOfficialQuestionDetail(id, detail);
                 questionReadCacheSupport.writeOfficialQuestionAnswer(id, buildAnswerVO(question));
+            } else if (customScope != null) {
+                questionReadCacheSupport.writeScopedCustomQuestionDetail(customScope, id, detail);
+                questionReadCacheSupport.writeScopedCustomQuestionAnswer(customScope, id, buildAnswerVO(question));
             }
             log.info("[perf][question-detail] cache-miss id={} sourceType={} tookMs={}",
                     id, safe(question.getSourceType()), elapsedMs(startNs));
@@ -196,6 +209,18 @@ public class QuestionApplicationService {
             return new QuestionViewCountVO(id, nextCount);
         }
 
+        String customScope = resolveCustomQuestionScope(authentication);
+        if (customScope != null) {
+            QuestionDetailVO customCached = questionReadCacheSupport.readScopedCustomQuestionDetail(customScope, id);
+            if (customCached != null) {
+                int nextCount = questionReadCacheSupport.incrementAndGetOfficialQuestionViewCount(id, customCached.getViewCount() == null ? 0 : customCached.getViewCount());
+                customCached.setViewCount(nextCount);
+                questionReadCacheSupport.writeScopedCustomQuestionDetail(customScope, id, customCached);
+                log.info("[perf][question-view] buffered-custom id={} scope={} nextCount={} tookMs={}", id, customScope, nextCount, elapsedMs(startNs));
+                return new QuestionViewCountVO(id, nextCount);
+            }
+        }
+
         Question question = questionAccessSupport.resolveAccessibleQuestion(id, authentication);
         if (question == null) {
             throw new NotFoundException(QUESTION_NOT_FOUND_MESSAGE);
@@ -206,6 +231,10 @@ public class QuestionApplicationService {
             QuestionDetailVO detail = toQuestionDetailVO(question);
             detail.setViewCount(nextCount);
             questionReadCacheSupport.writeOfficialQuestionDetail(id, detail);
+        } else if (customScope != null) {
+            QuestionDetailVO detail = toQuestionDetailVO(question);
+            detail.setViewCount(nextCount);
+            questionReadCacheSupport.writeScopedCustomQuestionDetail(customScope, id, detail);
         }
         log.info("[perf][question-view] fallback-buffered id={} nextCount={} sourceType={} tookMs={}",
                 id, nextCount, safe(question.getSourceType()), elapsedMs(startNs));
@@ -287,6 +316,15 @@ public class QuestionApplicationService {
             return cached;
         }
 
+        String customScope = resolveCustomQuestionScope(authentication);
+        if (customScope != null) {
+            QuestionAnswerVO customCached = questionReadCacheSupport.readScopedCustomQuestionAnswer(customScope, id);
+            if (customCached != null) {
+                log.info("[perf][question-answer] cache-hit-custom id={} scope={} tookMs={}", id, customScope, elapsedMs(startNs));
+                return customCached;
+            }
+        }
+
         String lockToken = questionReadCacheSupport.tryLockOfficialQuestionAnswer(id);
         if (lockToken == null) {
             QuestionAnswerVO waitedCache = waitForOfficialQuestionAnswerCache(id);
@@ -313,6 +351,8 @@ public class QuestionApplicationService {
             QuestionAnswerVO answerVO = buildAnswerVO(question);
             if (isOfficialQuestion(question)) {
                 questionReadCacheSupport.writeOfficialQuestionAnswer(id, answerVO);
+            } else if (customScope != null) {
+                questionReadCacheSupport.writeScopedCustomQuestionAnswer(customScope, id, answerVO);
             }
             log.info("[perf][question-answer] cache-miss id={} sourceType={} tookMs={}",
                     id, safe(question.getSourceType()), elapsedMs(startNs));
@@ -466,6 +506,14 @@ public class QuestionApplicationService {
             return key;
         }
         return name;
+    }
+
+    private String resolveCustomQuestionScope(Authentication authentication) {
+        if (questionAccessSupport.isAdmin(authentication)) {
+            return "admin";
+        }
+        Long userId = questionAccessSupport.resolveCurrentUserId(authentication);
+        return userId == null || userId <= 0 ? null : "user:" + userId;
     }
 
     private QuestionListItemVO toQuestionListItemVO(Question question) {

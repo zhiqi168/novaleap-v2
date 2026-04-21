@@ -343,13 +343,6 @@
 
         <h1 class="mt-4 text-2xl font-bold text-text-primary leading-tight">{{ activeQuestion.title }}</h1>
 
-        <article class="question-content-card mt-5 rounded-3xl border border-border-subtle bg-bg-elevated backdrop-blur-xl p-6 shadow-sm">
-          <div class="text-sm font-semibold text-text-primary mb-3">题目内容</div>
-          <div class="prose prose-sm max-w-none text-text-secondary">
-            <TypeWriter :text="activeQuestion.content || '暂无题目内容'" :renderMarkdown="true" :isTyping="false" />
-          </div>
-        </article>
-
         <article class="question-answer-card mt-4 rounded-3xl border border-border-subtle bg-bg-elevated backdrop-blur-xl p-6 shadow-sm">
           <div class="flex items-center gap-3 mb-3 flex-wrap">
             <div class="text-sm font-semibold text-text-primary">参考答案</div>
@@ -1770,7 +1763,6 @@ onUnmounted(() => {
   padding-bottom: clamp(22px, 4vh, 44px);
 }
 
-.question-content-card,
 .question-answer-card,
 .question-ai-card,
 .question-empty-card {
@@ -1945,7 +1937,6 @@ onUnmounted(() => {
   border-color: var(--border-soft) !important;
 }
 
-.dark .question-content-card,
 .dark .question-answer-card,
 .dark .question-ai-card,
 .dark .question-empty-card {

@@ -38,6 +38,8 @@ public class QuestionReadCacheSupport {
     private static final String BANK_LIST_PREFIX = "nova:question:list:bank:";
     private static final String OFFICIAL_DETAIL_PREFIX = "nova:question:detail:official:";
     private static final String OFFICIAL_ANSWER_PREFIX = "nova:question:answer:official:";
+    private static final String CUSTOM_DETAIL_PREFIX = "nova:question:detail:custom:";
+    private static final String CUSTOM_ANSWER_PREFIX = "nova:question:answer:custom:";
     private static final String CATEGORIES_KEY = "nova:question:categories";
     private static final String OFFICIAL_RANDOM_PREFIX = "nova:question:random:official:";
     private static final String BANK_RANDOM_PREFIX = "nova:question:random:bank:";
@@ -121,6 +123,22 @@ public class QuestionReadCacheSupport {
 
     public void writeOfficialQuestionAnswer(Long questionId, QuestionAnswerVO value) {
         writeValue(OFFICIAL_ANSWER_PREFIX + safe(questionId), value, QUESTION_ANSWER_TTL);
+    }
+
+    public QuestionDetailVO readScopedCustomQuestionDetail(String scope, Long questionId) {
+        return readValue(customDetailKey(scope, questionId), QuestionDetailVO.class);
+    }
+
+    public void writeScopedCustomQuestionDetail(String scope, Long questionId, QuestionDetailVO value) {
+        writeValue(customDetailKey(scope, questionId), value, QUESTION_DETAIL_TTL);
+    }
+
+    public QuestionAnswerVO readScopedCustomQuestionAnswer(String scope, Long questionId) {
+        return readValue(customAnswerKey(scope, questionId), QuestionAnswerVO.class);
+    }
+
+    public void writeScopedCustomQuestionAnswer(String scope, Long questionId, QuestionAnswerVO value) {
+        writeValue(customAnswerKey(scope, questionId), value, QUESTION_ANSWER_TTL);
     }
 
     public int incrementAndGetOfficialQuestionViewCount(Long questionId, int fallbackBaseCount) {
@@ -240,6 +258,8 @@ public class QuestionReadCacheSupport {
         evictRandomPools();
         deleteByPrefix(OFFICIAL_DETAIL_PREFIX);
         deleteByPrefix(OFFICIAL_ANSWER_PREFIX);
+        deleteByPrefix(CUSTOM_DETAIL_PREFIX);
+        deleteByPrefix(CUSTOM_ANSWER_PREFIX);
     }
 
     private <T> T readValue(String key, Class<T> type) {
@@ -320,6 +340,20 @@ public class QuestionReadCacheSupport {
     private String normalize(String value) {
         String normalized = value == null ? "" : value.trim();
         return normalized.replace(" ", "_");
+    }
+
+    private String customDetailKey(String scope, Long questionId) {
+        if (!StringUtils.hasText(scope) || questionId == null) {
+            return "";
+        }
+        return CUSTOM_DETAIL_PREFIX + normalize(scope) + ":" + safe(questionId);
+    }
+
+    private String customAnswerKey(String scope, Long questionId) {
+        if (!StringUtils.hasText(scope) || questionId == null) {
+            return "";
+        }
+        return CUSTOM_ANSWER_PREFIX + normalize(scope) + ":" + safe(questionId);
     }
 
     private Long parseLong(Object value) {

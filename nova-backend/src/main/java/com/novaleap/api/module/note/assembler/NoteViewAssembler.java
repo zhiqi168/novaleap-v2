@@ -65,6 +65,9 @@ public final class NoteViewAssembler {
     }
 
     private static int wordCountOf(String content) {
-        return content == null ? 0 : content.length();
+        if (content == null || content.isBlank()) {
+            return 0;
+        }
+        return content.length();
     }
 }

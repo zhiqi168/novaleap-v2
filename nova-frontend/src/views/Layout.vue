@@ -132,13 +132,12 @@
         <section class="workspace-host">
           <router-view v-slot="{ Component }">
             <transition
-              enter-active-class="transition-opacity duration-200"
+              enter-active-class="transition-opacity duration-120"
               enter-from-class="opacity-0"
               enter-to-class="opacity-100"
-              leave-active-class="transition-opacity duration-150"
+              leave-active-class="transition-opacity duration-90"
               leave-from-class="opacity-100"
               leave-to-class="opacity-0"
-              mode="out-in"
             >
               <keep-alive :include="['Home', 'QuestionBank', 'Notes', 'Me']">
                 <component :is="Component" />

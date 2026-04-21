@@ -111,7 +111,6 @@ public class NoteApplicationService {
                         Note::getCategory,
                         Note::getEmoji,
                         Note::getAuthor,
-                        Note::getContent,
                         Note::getViewCount,
                         Note::getStatus,
                         Note::getRejectReason,
@@ -164,7 +163,6 @@ public class NoteApplicationService {
                         Note::getCategory,
                         Note::getEmoji,
                         Note::getAuthor,
-                        Note::getContent,
                         Note::getViewCount,
                         Note::getStatus,
                         Note::getRejectReason,
@@ -276,7 +274,6 @@ public class NoteApplicationService {
                             Note::getCategory,
                             Note::getEmoji,
                             Note::getAuthor,
-                            Note::getContent,
                             Note::getViewCount,
                             Note::getStatus,
                             Note::getRejectReason,
@@ -305,7 +302,6 @@ public class NoteApplicationService {
                         Note::getCategory,
                         Note::getEmoji,
                         Note::getAuthor,
-                        Note::getContent,
                         Note::getViewCount,
                         Note::getStatus,
                         Note::getRejectReason,
@@ -547,13 +543,15 @@ public class NoteApplicationService {
     private Long countLikes(Long noteId) {
         LambdaQueryWrapper<NoteLike> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(NoteLike::getNoteId, noteId);
-        return noteLikeMapper.selectCount(wrapper);
+        Long count = noteLikeMapper.selectCount(wrapper);
+        return count == null ? 0L : count;
     }
 
     private Long countComments(Long noteId) {
         LambdaQueryWrapper<NoteComment> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(NoteComment::getNoteId, noteId);
-        return noteCommentMapper.selectCount(wrapper);
+        Long count = noteCommentMapper.selectCount(wrapper);
+        return count == null ? 0L : count;
     }
 
     private Map<Long, Long> loadLikeCountMap(List<Long> noteIds) {
