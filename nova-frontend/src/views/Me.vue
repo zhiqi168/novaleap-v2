@@ -315,7 +315,7 @@ const triggerStartupBurst = () => {
   startupBurstTimer = window.setTimeout(() => {
     startupBurstTimer = 0
     playConfettiBurst()
-  }, 180)
+  }, 260)
 }
 
 const goProfile = () => {
