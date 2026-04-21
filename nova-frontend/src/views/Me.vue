@@ -200,8 +200,13 @@ const CONFETTI_DURATION_MS = 1000
 const CONFETTI_SPREAD = 40
 const CONFETTI_RICH_COLORS = ['#bb0000','#f89aa5','#121314']
 let confettiFrameId = 0
+let startupBurstTimer = 0
 
 const stopConfettiBurst = () => {
+  if (startupBurstTimer) {
+    clearTimeout(startupBurstTimer)
+    startupBurstTimer = 0
+  }
   if (confettiFrameId) {
     cancelAnimationFrame(confettiFrameId)
     confettiFrameId = 0
@@ -220,7 +225,7 @@ const playConfettiBurst = ({ duration = CONFETTI_DURATION_MS, particleCount = 2 
     startVelocity: 60,
     decay: 0.88,
     scalar: 0.92,
-    zIndex: 30,
+    zIndex: 1400,
   }
 
   const frame = () => {
@@ -304,7 +309,13 @@ const cheerUp = () => {
 }
 
 const triggerStartupBurst = () => {
-  playConfettiBurst()
+  if (startupBurstTimer) {
+    clearTimeout(startupBurstTimer)
+  }
+  startupBurstTimer = window.setTimeout(() => {
+    startupBurstTimer = 0
+    playConfettiBurst()
+  }, 180)
 }
 
 const goProfile = () => {
@@ -315,6 +326,7 @@ onMounted(async () => {
   applyCachedDailyQuote()
   fetchDailyQuote()
   scheduleDailyQuoteRefresh()
+  triggerStartupBurst()
 
   hourTimer = window.setInterval(() => {
     currentHour.value = new Date().getHours()
