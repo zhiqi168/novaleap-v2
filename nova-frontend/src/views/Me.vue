@@ -45,9 +45,9 @@
 </template>
 
 <script setup>
-import confetti from 'canvas-confetti'
 import { computed, onActivated, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
+import { fireConfetti, resetConfetti } from '@/composables/useConfetti'
 import { useAuthStore } from '@/stores/auth'
 import { api } from '@/composables/useRequest'
 
@@ -211,7 +211,7 @@ const stopConfettiBurst = () => {
     cancelAnimationFrame(confettiFrameId)
     confettiFrameId = 0
   }
-  confetti.reset()
+  resetConfetti()
 }
 
 const playConfettiBurst = ({ duration = CONFETTI_DURATION_MS, particleCount = 2 } = {}) => {
@@ -229,12 +229,12 @@ const playConfettiBurst = ({ duration = CONFETTI_DURATION_MS, particleCount = 2 
   }
 
   const frame = () => {
-    confetti({
+    fireConfetti({
       ...sharedOptions,
       angle: 60,
       origin: { x: 0 },
     })
-    confetti({
+    fireConfetti({
       ...sharedOptions,
       angle: 120,
       origin: { x: 1 },

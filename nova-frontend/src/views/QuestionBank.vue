@@ -583,9 +583,9 @@
 
 <script setup>
 import { computed, nextTick, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
-import confetti from 'canvas-confetti'
 import TypeWriter from '@/components/common/TypeWriter.vue'
 import LoadingDots from '@/components/common/LoadingDots.vue'
+import { fireConfetti, resetConfetti } from '@/composables/useConfetti'
 import { useSSE } from '@/composables/useSSE'
 import { api } from '@/composables/useRequest'
 import { useAuthStore } from '@/stores/auth'
@@ -852,7 +852,7 @@ const stopQuestionDoneConfetti = () => {
     clearInterval(questionDoneConfettiIntervalId)
     questionDoneConfettiIntervalId = 0
   }
-  confetti.reset()
+  resetConfetti()
 }
 
 const randomInRange = (min, max) => Math.random() * (max - min) + min
@@ -877,12 +877,12 @@ const celebrateQuestionDone = () => {
     }
 
     const particleCount = 50 * (timeLeft / duration)
-    confetti({
+    fireConfetti({
       ...defaults,
       particleCount,
       origin: { x: randomInRange(0.1, 0.3), y: Math.random() - 0.2 },
     })
-    confetti({
+    fireConfetti({
       ...defaults,
       particleCount,
       origin: { x: randomInRange(0.7, 0.9), y: Math.random() - 0.2 },
