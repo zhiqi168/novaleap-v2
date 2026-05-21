@@ -1,27 +1,8 @@
 import { ref } from 'vue'
+import { TOKEN_KEY, USER_KEY } from '@/config/constants'
+import { withApiBase } from '@/config/api'
 
-const BASE_URL = String(import.meta.env.VITE_API_BASE_URL || '').trim().replace(/\/+$/, '')
 const DEFAULT_TIMEOUT_MS = 12000
-
-function normalizeUrl(url) {
-  const raw = String(url || '').trim()
-  if (!raw) return '/'
-  if (/^https?:\/\//i.test(raw)) {
-    return raw
-  }
-  return raw.startsWith('/') ? raw : `/${raw}`
-}
-
-const readToken = () => sessionStorage.getItem('nova_token') || localStorage.getItem('nova_token')
-
-const clearAuthStorage = () => {
-  sessionStorage.removeItem('nova_token')
-  sessionStorage.removeItem('nova_user')
-  localStorage.removeItem('nova_token')
-  localStorage.removeItem('nova_user')
-}
-
-const sleep = (ms) => new Promise((resolve) => window.setTimeout(resolve, ms))
 
 function isRetryableStatus(status) {
   return [408, 429, 502, 503, 504].includes(Number(status))
@@ -42,6 +23,15 @@ function isRetryableNetworkError(error) {
     || message.includes('networkerror')
     || message.includes('load failed')
     || message.includes('fetch failed')
+}
+
+const readToken = () => sessionStorage.getItem(TOKEN_KEY) || localStorage.getItem(TOKEN_KEY)
+
+const clearAuthStorage = () => {
+  sessionStorage.removeItem(TOKEN_KEY)
+  sessionStorage.removeItem(USER_KEY)
+  localStorage.removeItem(TOKEN_KEY)
+  localStorage.removeItem(USER_KEY)
 }
 
 async function request(url, options = {}) {
@@ -66,7 +56,7 @@ async function request(url, options = {}) {
     headers.Authorization = `Bearer ${token}`
   }
 
-  const targetUrl = `${BASE_URL}${normalizeUrl(url)}`
+  const targetUrl = withApiBase(url)
   let lastError = null
 
   for (let attempt = 0; attempt <= retryCount; attempt += 1) {

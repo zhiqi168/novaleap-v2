@@ -9,6 +9,7 @@ import com.novaleap.api.module.question.vo.QuestionCategoryOptionVO;
 import com.novaleap.api.module.question.vo.QuestionDetailVO;
 import com.novaleap.api.module.question.vo.QuestionListItemVO;
 import com.novaleap.api.module.questionbank.vo.CustomQuestionBankVO;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
@@ -23,6 +24,7 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ThreadLocalRandom;
 
+@Slf4j
 @Component
 public class QuestionReadCacheSupport {
 
@@ -295,6 +297,7 @@ public class QuestionReadCacheSupport {
         try {
             redisTemplate.opsForValue().set(key, objectMapper.writeValueAsString(value), withJitter(ttl));
         } catch (Exception ignore) {
+            log.debug("Redis write value failed for key={}", key, ignore);
         }
     }
 
@@ -321,6 +324,7 @@ public class QuestionReadCacheSupport {
                 redisTemplate.delete(key);
             }
         } catch (Exception ignore) {
+            log.debug("Redis release lock failed for key={}", key, ignore);
         }
     }
 
@@ -329,11 +333,18 @@ public class QuestionReadCacheSupport {
             return;
         }
         try {
-            Set<String> keys = redisTemplate.keys(prefix + "*");
-            if (keys != null && !keys.isEmpty()) {
-                redisTemplate.delete(keys);
-            }
+            redisTemplate.execute((org.springframework.data.redis.core.RedisCallback<Void>) connection -> {
+                org.springframework.data.redis.core.ScanOptions options =
+                        org.springframework.data.redis.core.ScanOptions.scanOptions().match(prefix + "*").count(100).build();
+                try (var cursor = connection.scan(options)) {
+                    while (cursor.hasNext()) {
+                        connection.delete(cursor.next());
+                    }
+                }
+                return null;
+            });
         } catch (Exception ignore) {
+            log.debug("Redis delete by prefix failed for prefix={}", prefix, ignore);
         }
     }
 

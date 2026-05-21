@@ -1,4 +1,5 @@
 import { withApiBase } from '@/config/api'
+import { TOKEN_KEY } from '@/config/constants'
 
 const VISITOR_KEY = 'nova_visitor_id'
 
@@ -43,7 +44,7 @@ export function reportVisit(path) {
     path: safePath
   })
 
-  const token = sessionStorage.getItem('nova_token') || localStorage.getItem('nova_token')
+  const token = sessionStorage.getItem(TOKEN_KEY) || localStorage.getItem(TOKEN_KEY)
   const targetUrl = withApiBase('/api/analytics/visit')
 
   if (!token && typeof navigator !== 'undefined' && typeof navigator.sendBeacon === 'function') {

@@ -36,7 +36,7 @@ nova:
     secret: ${NOVA_TURNSTILE_SECRET:}
   mail:
     resend:
-      api-key: ${NOVA_RESEND_API_KEY:re_dwMoZ46Y_3qMNpkzVFcrmC1QDXk33LupG}
+      api-key: ${NOVA_RESEND_API_KEY:}
       from: ${NOVA_RESEND_FROM:NovaLeap <zhiqi@novaleap.xyz>}
   ai:
     quota:

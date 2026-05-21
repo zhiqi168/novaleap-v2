@@ -1,10 +1,13 @@
 import { ref } from 'vue'
 import { withApiBase } from '@/config/api'
+import { TOKEN_KEY } from '@/config/constants'
 
 const DEFAULT_STREAM_TIMEOUT_MS = 25000
 const DEFAULT_FIRST_CHUNK_TIMEOUT_MS = 6000
 
-const sleep = (ms) => new Promise((resolve) => window.setTimeout(resolve, ms))
+function sleep(ms) {
+  return new Promise((resolve) => window.setTimeout(resolve, ms))
+}
 
 function createTimeoutError(message, name = 'TimeoutError') {
   const error = new Error(message)
@@ -121,7 +124,7 @@ export function useSSE() {
     const retryDelayMs = Math.max(0, Number(options.retryDelayMs ?? 700))
     const timeoutMs = Math.max(1000, Number(options.timeoutMs ?? DEFAULT_STREAM_TIMEOUT_MS))
     const firstChunkTimeoutMs = Math.max(1000, Number(options.firstChunkTimeoutMs ?? DEFAULT_FIRST_CHUNK_TIMEOUT_MS))
-    const token = sessionStorage.getItem('nova_token') || localStorage.getItem('nova_token')
+    const token = sessionStorage.getItem(TOKEN_KEY) || localStorage.getItem(TOKEN_KEY)
 
     clearExistingRequest()
     stopAppendTimer()

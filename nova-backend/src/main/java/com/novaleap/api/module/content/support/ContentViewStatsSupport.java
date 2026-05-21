@@ -1,5 +1,6 @@
 package com.novaleap.api.module.content.support;
 
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
@@ -14,6 +15,7 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.ThreadLocalRandom;
 
+@Slf4j
 @Component
 public class ContentViewStatsSupport {
 
@@ -72,6 +74,7 @@ public class ContentViewStatsSupport {
             try {
                 redisTemplate.opsForValue().set(totalKey, String.valueOf(resolved), withJitter(VIEW_TOTAL_TTL));
             } catch (Exception ignore) {
+                log.debug("Redis write total view count failed for key={}", totalKey, ignore);
             }
         }
         return safeInt(resolved);
@@ -104,6 +107,7 @@ public class ContentViewStatsSupport {
                 try {
                     redisTemplate.opsForValue().set(totalKey(totalKeyPrefix, id), String.valueOf(resolved), withJitter(VIEW_TOTAL_TTL));
                 } catch (Exception ignore) {
+                    log.debug("Redis write total view count failed for id={}", id, ignore);
                 }
             }
             result.put(id, safeInt(resolved));
@@ -148,6 +152,7 @@ public class ContentViewStatsSupport {
                 redisTemplate.opsForHash().delete(pendingKey, String.valueOf(contentId));
             }
         } catch (Exception ignore) {
+            log.debug("Redis acknowledge pending view count failed for contentId={}", contentId, ignore);
         }
     }
 
@@ -162,6 +167,7 @@ public class ContentViewStatsSupport {
                     withJitter(VIEW_TOTAL_TTL)
             );
         } catch (Exception ignore) {
+            log.debug("Redis reset total view count failed for contentId={}", contentId, ignore);
         }
     }
 
@@ -172,6 +178,7 @@ public class ContentViewStatsSupport {
         try {
             redisTemplate.delete(totalKey(totalKeyPrefix, contentId));
         } catch (Exception ignore) {
+            log.debug("Redis evict total view count failed for contentId={}", contentId, ignore);
         }
     }
 
@@ -204,6 +211,7 @@ public class ContentViewStatsSupport {
         try {
             redisTemplate.opsForHash().increment(pendingKey, String.valueOf(contentId), 1L);
         } catch (Exception ignore) {
+            log.debug("Redis increment pending view count failed for contentId={}", contentId, ignore);
         }
     }
 
@@ -214,6 +222,7 @@ public class ContentViewStatsSupport {
         try {
             redisTemplate.opsForZSet().incrementScore(hotKey, String.valueOf(contentId), 1D);
         } catch (Exception ignore) {
+            log.debug("Redis increment hot score failed for contentId={}", contentId, ignore);
         }
     }
 

@@ -236,7 +236,7 @@ public class NoteApplicationService {
         }
     }
 
-    @Transactional
+    @Transactional(rollbackFor = Exception.class)
     public NoteDetailVO increaseView(Long id, Authentication authentication) {
         long startNs = System.nanoTime();
         ActorIdentity actor = currentUserService.resolveActor(authentication);
@@ -322,7 +322,7 @@ public class NoteApplicationService {
         return hotList;
     }
 
-    @Transactional
+    @Transactional(rollbackFor = Exception.class)
     public NoteDetailVO createNote(NoteCreateRequest request, Authentication authentication) {
         User user = currentUserService.requireDatabaseUser(authentication, "\u8bf7\u5148\u767b\u5f55\u540e\u518d\u6295\u7a3f\u624b\u8bb0");
         validateNoteSubmission(request.getTitle(), request.getContent());
@@ -350,7 +350,7 @@ public class NoteApplicationService {
         return NoteViewAssembler.toDetailVO(note);
     }
 
-    @Transactional
+    @Transactional(rollbackFor = Exception.class)
     public NoteDetailVO updateNote(Long id, NoteUpdateRequest request, Authentication authentication) {
         User user = currentUserService.requireDatabaseUser(authentication, "\u8bf7\u5148\u767b\u5f55\u540e\u518d\u7f16\u8f91\u624b\u8bb0");
         Note note = noteMapper.selectById(id);
@@ -377,7 +377,7 @@ public class NoteApplicationService {
         return NoteViewAssembler.toDetailVO(note);
     }
 
-    @Transactional
+    @Transactional(rollbackFor = Exception.class)
     public NoteLikeVO toggleLike(Long id, Authentication authentication) {
         ActorIdentity actor = currentUserService.resolveActor(authentication);
         if (actor.isEmpty()) {
@@ -437,7 +437,7 @@ public class NoteApplicationService {
         return result;
     }
 
-    @Transactional
+    @Transactional(rollbackFor = Exception.class)
     public NoteCommentVO addComment(Long id, NoteCommentRequest request, Authentication authentication) {
         User user = currentUserService.requireDatabaseUser(authentication, "\u8bf7\u5148\u767b\u5f55\u540e\u518d\u53d1\u8868\u8bc4\u8bba");
         loadAccessibleNote(id, authentication);
@@ -456,7 +456,7 @@ public class NoteApplicationService {
         return toCommentVO(comment, new ActorIdentity("user", user.getUsername()));
     }
 
-    @Transactional
+    @Transactional(rollbackFor = Exception.class)
     public void deleteNote(Long id, Authentication authentication) {
         User user = currentUserService.requireDatabaseUser(authentication, "\u8bf7\u5148\u767b\u5f55\u540e\u518d\u5220\u9664\u624b\u8bb0");
         Note note = noteMapper.selectById(id);

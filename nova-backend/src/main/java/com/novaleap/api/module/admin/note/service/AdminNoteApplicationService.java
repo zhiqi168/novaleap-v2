@@ -78,7 +78,7 @@ public class AdminNoteApplicationService {
         return AdminNoteViewAssembler.toDetailVO(note);
     }
 
-    @Transactional
+    @Transactional(rollbackFor = Exception.class)
     public AdminNoteDetailVO createNote(AdminNoteSaveRequest request) {
         Note note = new Note();
         note.setTitle(request.getTitle());
@@ -99,7 +99,7 @@ public class AdminNoteApplicationService {
         return AdminNoteViewAssembler.toDetailVO(note);
     }
 
-    @Transactional
+    @Transactional(rollbackFor = Exception.class)
     public AdminNoteDetailVO updateNote(Long id, AdminNoteSaveRequest request) {
         Note note = noteMapper.selectById(id);
         if (note == null) {
@@ -123,7 +123,7 @@ public class AdminNoteApplicationService {
         return AdminNoteViewAssembler.toDetailVO(note);
     }
 
-    @Transactional
+    @Transactional(rollbackFor = Exception.class)
     public AdminNoteDetailVO updateNoteStatus(Long id, Integer status, String reason, String rejectReason, AdminNoteStatusRequest body) {
         Note note = noteMapper.selectById(id);
         if (note == null) {
@@ -153,7 +153,7 @@ public class AdminNoteApplicationService {
         return AdminNoteViewAssembler.toDetailVO(refreshed);
     }
 
-    @Transactional
+    @Transactional(rollbackFor = Exception.class)
     public void deleteNote(Long id) {
         Note note = noteMapper.selectById(id);
         if (note == null) {

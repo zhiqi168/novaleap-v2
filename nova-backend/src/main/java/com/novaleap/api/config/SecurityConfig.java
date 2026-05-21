@@ -98,7 +98,11 @@ public class SecurityConfig {
                 .map(String::trim)
                 .filter(origin -> !origin.isEmpty())
                 .collect(Collectors.toList());
-        configuration.setAllowedOriginPatterns(origins.isEmpty() ? List.of("*") : origins);
+        if (origins.isEmpty()) {
+            throw new IllegalStateException(
+                    "NOVA_ALLOWED_ORIGINS is not configured. Set it to your frontend domain(s) in production.");
+        }
+        configuration.setAllowedOriginPatterns(origins);
         configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
         configuration.setAllowedHeaders(List.of("*"));
         configuration.setExposedHeaders(List.of("Authorization", "Content-Disposition"));

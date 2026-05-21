@@ -8,7 +8,7 @@ const now = () => Date.now()
 function cloneValue(value) {
   if (value == null) return value
   try {
-    return JSON.parse(JSON.stringify(value))
+    return structuredClone(value)
   } catch (_) {
     return value
   }

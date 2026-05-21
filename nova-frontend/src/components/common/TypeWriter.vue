@@ -18,6 +18,7 @@
 <script setup>
 import { computed, onUnmounted, ref, watch } from 'vue'
 import { marked } from 'marked'
+import DOMPurify from 'dompurify'
 
 const props = defineProps({
   text: {
@@ -42,32 +43,10 @@ let streamSession = false
 const sanitizeHtml = (unsafeHtml) => {
   const raw = String(unsafeHtml || '')
   if (!raw) return ''
-
-  const parser = new DOMParser()
-  const doc = parser.parseFromString(raw, 'text/html')
-
-  const blockedTags = ['script', 'iframe', 'object', 'embed', 'link', 'style', 'meta']
-  blockedTags.forEach((tag) => {
-    doc.querySelectorAll(tag).forEach((node) => node.remove())
+  return DOMPurify.sanitize(raw, {
+    ALLOWED_TAGS: ['b', 'i', 'em', 'strong', 'a', 'p', 'br', 'ul', 'ol', 'li', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'blockquote', 'code', 'pre', 'span', 'div', 'img', 'table', 'thead', 'tbody', 'tr', 'th', 'td', 'hr'],
+    ALLOWED_ATTR: ['href', 'src', 'alt', 'title', 'class'],
   })
-
-  doc.querySelectorAll('*').forEach((node) => {
-    Array.from(node.attributes).forEach((attr) => {
-      const name = attr.name.toLowerCase()
-      const value = String(attr.value || '').trim().toLowerCase()
-
-      if (name.startsWith('on')) {
-        node.removeAttribute(attr.name)
-        return
-      }
-
-      if ((name === 'href' || name === 'src' || name === 'xlink:href') && value.startsWith('javascript:')) {
-        node.removeAttribute(attr.name)
-      }
-    })
-  })
-
-  return doc.body.innerHTML
 }
 
 const normalizeMarkdown = (input) => {

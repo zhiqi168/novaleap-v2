@@ -8,6 +8,7 @@ import com.novaleap.api.module.content.support.ContentViewStatsSupport;
 import com.novaleap.api.module.note.vo.NoteDetailVO;
 import com.novaleap.api.module.note.vo.NoteListItemVO;
 import com.novaleap.api.module.system.security.ActorIdentity;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
@@ -22,6 +23,7 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ThreadLocalRandom;
 
+@Slf4j
 @Component
 public class NoteReadCacheSupport {
 
@@ -163,6 +165,7 @@ public class NoteReadCacheSupport {
         try {
             redisTemplate.opsForValue().set(key, String.valueOf(liked), withJitter(LIKE_STATE_TTL));
         } catch (Exception ignore) {
+            log.debug("Redis write liked state failed for noteId={}", noteId, ignore);
         }
     }
 
@@ -283,6 +286,7 @@ public class NoteReadCacheSupport {
         try {
             redisTemplate.opsForValue().set(key, objectMapper.writeValueAsString(value), withJitter(ttl));
         } catch (Exception ignore) {
+            log.debug("Redis write value failed for key={}", key, ignore);
         }
     }
 
@@ -309,6 +313,7 @@ public class NoteReadCacheSupport {
                 redisTemplate.delete(key);
             }
         } catch (Exception ignore) {
+            log.debug("Redis release lock failed for key={}", key, ignore);
         }
     }
 
@@ -317,11 +322,18 @@ public class NoteReadCacheSupport {
             return;
         }
         try {
-            Set<String> keys = redisTemplate.keys(prefix + "*");
-            if (keys != null && !keys.isEmpty()) {
-                redisTemplate.delete(keys);
-            }
+            redisTemplate.execute((org.springframework.data.redis.core.RedisCallback<Void>) connection -> {
+                org.springframework.data.redis.core.ScanOptions options =
+                        org.springframework.data.redis.core.ScanOptions.scanOptions().match(prefix + "*").count(100).build();
+                try (var cursor = connection.scan(options)) {
+                    while (cursor.hasNext()) {
+                        connection.delete(cursor.next());
+                    }
+                }
+                return null;
+            });
         } catch (Exception ignore) {
+            log.debug("Redis delete by prefix failed for prefix={}", prefix, ignore);
         }
     }
 

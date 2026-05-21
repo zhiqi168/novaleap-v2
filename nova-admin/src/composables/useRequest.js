@@ -1,15 +1,5 @@
 import { clearAdminToken, getAdminToken } from '@/composables/adminAuthStorage'
-
-const BASE_URL = String(import.meta.env.VITE_API_BASE_URL || '').trim().replace(/\/+$/, '')
-
-function normalizeUrl(url) {
-  const raw = String(url || '').trim()
-  if (!raw) return '/'
-  if (/^https?:\/\//i.test(raw)) {
-    return raw
-  }
-  return raw.startsWith('/') ? raw : `/${raw}`
-}
+import { withApiBase } from '@/config/api'
 
 async function request(url, options = {}) {
   const token = getAdminToken()
@@ -27,7 +17,7 @@ async function request(url, options = {}) {
     headers.Authorization = `Bearer ${token}`
   }
 
-  const response = await fetch(`${BASE_URL}${normalizeUrl(url)}`, {
+  const response = await fetch(withApiBase(url), {
     ...options,
     headers,
     body: options.body

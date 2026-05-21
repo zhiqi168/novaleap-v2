@@ -1,6 +1,7 @@
 import { ref } from 'vue'
 import { createRouter, createWebHistory } from 'vue-router'
 import { reportVisit } from '@/services/analytics'
+import { TOKEN_KEY, USER_KEY } from '@/config/constants'
 
 const readAuthStorage = (key) => sessionStorage.getItem(key) || localStorage.getItem(key)
 
@@ -190,11 +191,11 @@ const router = createRouter({
 router.beforeEach((to, from, next) => {
   startRouteLoading()
 
-  const token = readAuthStorage('nova_token')
+  const token = readAuthStorage(TOKEN_KEY)
   let isGuest = false
 
   try {
-    const user = JSON.parse(readAuthStorage('nova_user') || 'null')
+    const user = JSON.parse(readAuthStorage(USER_KEY) || 'null')
     isGuest = user?.role === 'GUEST'
   } catch (_) {
     isGuest = false

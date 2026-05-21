@@ -1,9 +1,8 @@
 import { defineStore } from 'pinia'
 import { computed, ref } from 'vue'
+import { TOKEN_KEY, USER_KEY } from '@/config/constants'
 
 const DEFAULT_AVATAR = '🥳'
-const TOKEN_KEY = 'nova_token'
-const USER_KEY = 'nova_user'
 
 const readSession = (key) => sessionStorage.getItem(key)
 const writeSession = (key, value) => sessionStorage.setItem(key, value)
