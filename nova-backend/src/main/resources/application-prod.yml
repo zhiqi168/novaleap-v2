@@ -11,16 +11,8 @@ spring:
       password: ${SPRING_DATA_REDIS_PASSWORD:}
       database: ${SPRING_DATA_REDIS_DATABASE:0}
   ai:
-    openai:
-      api-key: ${SPRING_AI_OPENAI_API_KEY:}
-      base-url: ${SPRING_AI_OPENAI_BASE_URL:https://api.longcat.chat/openai}
-      chat:
-        options:
-          model: ${LONGCAT_MODEL:LongCat-Flash-Chat}
-      usage:
-        enabled: true
-        max-tokens: ${SPRING_AI_OPENAI_MAX_TOKENS:10000000}
-        fallback-model: ${LONGCAT_MODEL_FALLBACK:LongCat-Flash-Lite}
+    # 不再使用 spring.ai.openai.* 自动配置
+    # 所有 AI 模型配置由 novaleap.ai.* 统一管理
   sql:
     init:
       mode: never

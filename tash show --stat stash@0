@@ -1,0 +1,21 @@
+ nova-admin/src/composables/useRequest.js           | 14 [32m++[m[31m-------[m
+ nova-admin/src/config/api.js                       | 10 [32m+++++++[m
+ .../java/com/novaleap/api/NovaLeapApplication.java |  3 [31m--[m
+ .../com/novaleap/api/config/SecurityConfig.java    |  6 [32m+++[m[31m-[m
+ .../note/service/AdminNoteApplicationService.java  |  8 [32m++[m[31m---[m
+ .../content/support/ContentViewStatsSupport.java   |  9 [32m++++++[m
+ .../note/service/NoteApplicationService.java       | 12 [32m++++[m[31m----[m
+ .../module/note/support/NoteReadCacheSupport.java  | 20 [32m++++++++++[m[31m---[m
+ .../question/support/QuestionReadCacheSupport.java | 19 [32m+++++++++[m[31m---[m
+ nova-backend/src/main/resources/application.yml    |  2 [32m+[m[31m-[m
+ nova-frontend/package-lock.json                    | 17 [32m+++++++++++[m
+ nova-frontend/package.json                         |  1 [32m+[m
+ nova-frontend/src/components/common/TypeWriter.vue | 29 [32m+++[m[31m---------------[m
+ nova-frontend/src/composables/useRequest.js        | 34 [32m++++++++[m[31m--------------[m
+ nova-frontend/src/composables/useSSE.js            |  7 [32m+++[m[31m--[m
+ nova-frontend/src/config/constants.js              |  2 [32m++[m
+ nova-frontend/src/router/index.js                  |  5 [32m++[m[31m--[m
+ nova-frontend/src/services/analytics.js            |  3 [32m+[m[31m-[m
+ nova-frontend/src/stores/auth.js                   |  3 [32m+[m[31m-[m
+ nova-frontend/src/stores/resourceCache.js          |  2 [32m+[m[31m-[m
+ 20 files changed, 116 insertions(+), 90 deletions(-)

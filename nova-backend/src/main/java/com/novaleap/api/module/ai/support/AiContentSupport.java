@@ -30,7 +30,7 @@ public class AiContentSupport {
     );
 
     private static final Set<String> FORBIDDEN_IDENTITY_TERMS = Set.of(
-            "longcat", "美团", "openai", "chatgpt", "gpt", "claude", "anthropic"
+            "美团", "openai", "chatgpt", "gpt", "claude", "anthropic"
     );
 
     private final ObjectMapper objectMapper;

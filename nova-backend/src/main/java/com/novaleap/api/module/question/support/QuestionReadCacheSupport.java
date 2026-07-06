@@ -338,7 +338,7 @@ public class QuestionReadCacheSupport {
                         org.springframework.data.redis.core.ScanOptions.scanOptions().match(prefix + "*").count(100).build();
                 try (var cursor = connection.scan(options)) {
                     while (cursor.hasNext()) {
-                        connection.delete(cursor.next());
+                        connection.del(cursor.next());
                     }
                 }
                 return null;

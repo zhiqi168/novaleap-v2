@@ -2,16 +2,17 @@ package com.novaleap.api.service.impl;
 
 import com.novaleap.api.entity.Question;
 import com.novaleap.api.mapper.QuestionMapper;
+import com.novaleap.api.module.ai.config.NovaLeapAiProperties;
 import com.novaleap.api.module.ai.support.AiCoachSessionSupport;
 import com.novaleap.api.module.ai.support.AiExternalContextService;
 import com.novaleap.api.module.ai.support.AiIdentitySupport;
 import com.novaleap.api.module.ai.support.AiModelGateway;
 import com.novaleap.api.module.ai.support.AiNoteWorkflowSupport;
 import com.novaleap.api.module.ai.support.AiPromptFactory;
+import com.novaleap.api.module.ai.support.INovaLeapAiService;
 import com.novaleap.api.service.AiLimitService;
 import com.novaleap.api.service.AiService;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
@@ -49,7 +50,7 @@ public class AiServiceImpl implements AiService {
     private final AiPromptFactory aiPromptFactory;
     private final AiIdentitySupport aiIdentitySupport;
     private final AiNoteWorkflowSupport aiNoteWorkflowSupport;
-    private final String openAiApiKey;
+    private final NovaLeapAiProperties novaleapAiProperties;
 
     public AiServiceImpl(
             QuestionMapper questionMapper,
@@ -60,7 +61,7 @@ public class AiServiceImpl implements AiService {
             AiPromptFactory aiPromptFactory,
             AiIdentitySupport aiIdentitySupport,
             AiNoteWorkflowSupport aiNoteWorkflowSupport,
-            @Value("${spring.ai.openai.api-key:" + AI_KEY_PLACEHOLDER + "}") String openAiApiKey
+            NovaLeapAiProperties novaleapAiProperties
     ) {
         this.questionMapper = questionMapper;
         this.aiLimitService = aiLimitService;
@@ -70,9 +71,9 @@ public class AiServiceImpl implements AiService {
         this.aiPromptFactory = aiPromptFactory;
         this.aiIdentitySupport = aiIdentitySupport;
         this.aiNoteWorkflowSupport = aiNoteWorkflowSupport;
-        this.openAiApiKey = openAiApiKey == null ? "" : openAiApiKey.trim();
+        this.novaleapAiProperties = novaleapAiProperties;
         if (!hasAiCapability()) {
-            log.warn("AI capability is disabled: missing SPRING_AI_OPENAI_API_KEY");
+            log.warn("AI capability is disabled: missing NOVALEAP_AI_API_KEY");
         }
     }
 
@@ -253,6 +254,7 @@ public class AiServiceImpl implements AiService {
     }
 
     private boolean hasAiCapability() {
-        return !openAiApiKey.isBlank() && !AI_KEY_PLACEHOLDER.equalsIgnoreCase(openAiApiKey);
+        String key = novaleapAiProperties.getApiKey();
+        return key != null && !key.isBlank() && !AI_KEY_PLACEHOLDER.equalsIgnoreCase(key.trim());
     }
 }

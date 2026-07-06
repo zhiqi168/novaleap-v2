@@ -90,10 +90,10 @@
             <scope>runtime</scope>
         </dependency>
 
-        <!-- Spring AI (兼容 OpenAI API) -->
+        <!-- Spring AI (OpenAI 兼容 API, 不自带自动配置) -->
         <dependency>
             <groupId>org.springframework.ai</groupId>
-            <artifactId>spring-ai-openai-spring-boot-starter</artifactId>
+            <artifactId>spring-ai-openai</artifactId>
         </dependency>
 
         <!-- 邮件模块 -->

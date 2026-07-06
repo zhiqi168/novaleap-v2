@@ -3,6 +3,7 @@ package com.novaleap.api.module.ai.support;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.novaleap.api.module.ai.audit.AiCallAuditService;
 import com.novaleap.api.module.ai.config.AiGatewayProperties;
+import com.novaleap.api.module.ai.config.NovaLeapAiProperties;
 import com.novaleap.api.module.quota.config.AiQuotaProperties;
 import com.novaleap.api.module.quota.support.AiQuotaUsageSupport;
 import com.novaleap.api.service.AiLimitService;
@@ -33,9 +34,6 @@ import static org.mockito.Mockito.when;
 class AiModelGatewayQuotaTest {
 
     @Mock
-    private ChatClient.Builder chatClientBuilder;
-
-    @Mock
     private ChatClient chatClient;
 
     @Mock
@@ -63,7 +61,6 @@ class AiModelGatewayQuotaTest {
 
     @BeforeEach
     void setUp() {
-        when(chatClientBuilder.build()).thenReturn(chatClient);
         when(redisTemplate.opsForValue()).thenReturn(valueOperations);
 
         AiQuotaProperties quotaProperties = new AiQuotaProperties();
@@ -76,8 +73,13 @@ class AiModelGatewayQuotaTest {
         gatewayProperties.setCircuitOpenSeconds(90);
         gatewayProperties.setMinResponseTokens(128);
 
+        NovaLeapAiProperties novaleapAiProperties = new NovaLeapAiProperties();
+        novaleapAiProperties.setModelName("deepseek-chat");
+        novaleapAiProperties.setFallbackModel("deepseek-chat");
+        novaleapAiProperties.setBaseUrl("https://api.deepseek.com");
+
         aiModelGateway = new AiModelGateway(
-                chatClientBuilder,
+                chatClient,
                 redisTemplate,
                 aiLimitService,
                 quotaProperties,
@@ -85,8 +87,7 @@ class AiModelGatewayQuotaTest {
                 aiQuotaUsageSupport,
                 objectMapper,
                 aiCallAuditService,
-                "model-main",
-                "model-fallback"
+                novaleapAiProperties
         );
         dailyKey = "nova:ai:usage:model-main:" + LocalDate.now().format(DateTimeFormatter.ofPattern("yyyyMMdd"));
         failureKey = "nova:ai:circuit:fail:coach:model-main";
