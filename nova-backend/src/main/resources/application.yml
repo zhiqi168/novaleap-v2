@@ -67,7 +67,7 @@ novaleap:
     provider: ${NOVALEAP_AI_PROVIDER:deepseek}
     api-key: ${NOVALEAP_AI_API_KEY:11}
     base-url: ${NOVALEAP_AI_BASE_URL:https://api.deepseek.com}
-    model-name: ${NOVALEAP_AI_MODEL_NAME:deepseek-chat}
+    model-name: ${NOVALEAP_AI_MODEL_NAME:deepseek-v4-flash}
     fallback-model: ${NOVALEAP_AI_FALLBACK_MODEL:deepseek-v4-flash}
     max-tokens: ${NOVALEAP_AI_MAX_TOKENS:4096}
     request-timeout: ${NOVALEAP_AI_REQUEST_TIMEOUT:30000}

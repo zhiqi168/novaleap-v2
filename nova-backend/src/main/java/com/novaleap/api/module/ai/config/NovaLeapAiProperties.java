@@ -20,9 +20,9 @@ public class NovaLeapAiProperties {
     private String baseUrl = "https://api.deepseek.com";
 
     @NotBlank
-    private String modelName = "deepseek-chat";
+    private String modelName = "deepseek-v4-flash";
 
-    private String fallbackModel = "deepseek-chat";
+    private String fallbackModel = "deepseek-v4-flash";
 
     @Min(1)
     @Max(128_000)

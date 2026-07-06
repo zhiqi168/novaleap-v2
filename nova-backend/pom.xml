@@ -90,10 +90,16 @@
             <scope>runtime</scope>
         </dependency>
 
-        <!-- Spring AI (OpenAI 兼容 API, 不自带自动配置) -->
+        <!-- Spring AI (OpenAI 兼容 API, 排除自动配置以免与 novaleap.ai.* 冲突) -->
         <dependency>
             <groupId>org.springframework.ai</groupId>
             <artifactId>spring-ai-openai</artifactId>
+            <exclusions>
+                <exclusion>
+                    <groupId>org.springframework.ai</groupId>
+                    <artifactId>spring-ai-spring-boot-autoconfigure</artifactId>
+                </exclusion>
+            </exclusions>
         </dependency>
 
         <!-- 邮件模块 -->
