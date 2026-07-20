@@ -47,7 +47,7 @@ public class AuthTokenStateSupport {
             long tokenIssuedAtMillis = issuedAtMillis != null ? issuedAtMillis : issuedAt.getTime();
             return tokenIssuedAtMillis >= Long.parseLong(value);
         } catch (Exception ignore) {
-            return true;
+            return false;
         }
     }
 

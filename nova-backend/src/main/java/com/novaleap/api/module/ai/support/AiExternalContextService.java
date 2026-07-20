@@ -34,18 +34,23 @@ public class AiExternalContextService {
     private final boolean searchWebEnabled;
     private final int webTimeoutMs;
 
+    /** 自定义搜索引擎 URL。配置后优先使用此地址，为空则使用 DuckDuckGo + Wikipedia 回退 */
+    private final String searchUrl;
+
     public AiExternalContextService(
             ObjectMapper objectMapper,
             @Value("${nova.ai.web.enabled:true}") boolean webEnabled,
             @Value("${nova.ai.web.weather-enabled:true}") boolean weatherWebEnabled,
             @Value("${nova.ai.web.search-enabled:true}") boolean searchWebEnabled,
-            @Value("${nova.ai.web.request-timeout-ms:2500}") int webTimeoutMs
+            @Value("${nova.ai.web.request-timeout-ms:2500}") int webTimeoutMs,
+            @Value("${nova.ai.web.search-url:}") String searchUrl
     ) {
         this.objectMapper = objectMapper;
         this.webEnabled = webEnabled;
         this.weatherWebEnabled = weatherWebEnabled;
         this.searchWebEnabled = searchWebEnabled;
         this.webTimeoutMs = Math.max(800, Math.min(webTimeoutMs, 8_000));
+        this.searchUrl = safe(searchUrl);
         this.httpClient = HttpClient.newBuilder()
                 .connectTimeout(Duration.ofMillis(this.webTimeoutMs))
                 .version(HttpClient.Version.HTTP_2)
@@ -158,11 +163,79 @@ public class AiExternalContextService {
         }
     }
 
+    /**
+     * 使用自定义搜索引擎 URL 检索。searchUrl 模板中的 {query} 会被替换为实际搜索词。
+     * 期望返回 JSON 格式，至少包含 results 数组，每项有 title、content、url 字段。
+     * 兼容 SearXNG JSON 格式。
+     */
+    private String fetchCustomSearch(String query) {
+        String url = searchUrl.replace("{query}", URLEncoder.encode(query, StandardCharsets.UTF_8));
+        try {
+            JsonNode node = fetchJson(url);
+            // 兼容 SearXNG 格式: { results: [ { title:..., content:..., url:... } ] }
+            JsonNode results = node.path("results");
+            if (results.isArray() && !results.isEmpty()) {
+                StringBuilder sb = new StringBuilder("联网检索来源：自定义搜索引擎。");
+                int count = Math.min(5, results.size());
+                for (int i = 0; i < count; i++) {
+                    JsonNode item = results.get(i);
+                    String title = safe(item.path("title").asText(""));
+                    String content = safe(item.path("content").asText(""));
+                    String resultUrl = safe(item.path("url").asText(""));
+                    sb.append(" ").append(i + 1).append(") ").append(title);
+                    if (!content.isBlank()) {
+                        sb.append("：").append(content.length() > 150 ? content.substring(0, 150) + "..." : content);
+                    }
+                    if (!resultUrl.isBlank()) {
+                        sb.append("（").append(resultUrl).append("）");
+                    }
+                    sb.append("。");
+                }
+                return sb.length() > 1200 ? sb.substring(0, 1200) : sb.toString();
+            }
+            // 兼容通用 JSON 格式: { items: [ { title:..., snippet:..., link:... } ] }
+            JsonNode items = node.path("items");
+            if (items.isArray() && !items.isEmpty()) {
+                StringBuilder sb = new StringBuilder("联网检索来源：自定义搜索引擎。");
+                int count = Math.min(5, items.size());
+                for (int i = 0; i < count; i++) {
+                    JsonNode item = items.get(i);
+                    String title = safe(item.path("title").asText(""));
+                    String snippet = safe(item.path("snippet").asText(""));
+                    String link = safe(item.path("link").asText(""));
+                    sb.append(" ").append(i + 1).append(") ").append(title);
+                    if (!snippet.isBlank()) {
+                        sb.append("：").append(snippet.length() > 150 ? snippet.substring(0, 150) + "..." : snippet);
+                    }
+                    if (!link.isBlank()) {
+                        sb.append("（").append(link).append("）");
+                    }
+                    sb.append("。");
+                }
+                return sb.length() > 1200 ? sb.substring(0, 1200) : sb.toString();
+            }
+            return "";
+        } catch (Exception e) {
+            log.debug("custom search failed: {}", e.getMessage());
+            return "";
+        }
+    }
+
     private String fetchGeneralSearchSummary(String query) {
         String q = safe(query);
         if (q.isBlank()) {
             return "";
         }
+
+        // 如果配置了自定义搜索引擎 URL，优先使用
+        if (!searchUrl.isBlank()) {
+            String customResult = fetchCustomSearch(q);
+            if (!customResult.isBlank()) {
+                return customResult;
+            }
+        }
+
+        // 默认走 DuckDuckGo + Wikipedia 回退
         try {
             String url = "https://api.duckduckgo.com/?format=json&no_html=1&no_redirect=1&q="
                     + URLEncoder.encode(q, StandardCharsets.UTF_8);
@@ -304,6 +377,26 @@ public class AiExternalContextService {
             case 95, 96, 99 -> "雷暴";
             default -> "未知";
         };
+    }
+
+    /**
+     * 对外公开：联网搜索。Agent 工具通过此方法调用，而非基于启发式匹配。
+     */
+    public String searchWeb(String query) {
+        if (!webEnabled || !searchWebEnabled) {
+            return "";
+        }
+        return fetchGeneralSearchSummary(query);
+    }
+
+    /**
+     * 对外公开：查询天气。Agent 工具通过此方法调用，而非基于启发式匹配。
+     */
+    public String getWeather(String location) {
+        if (!webEnabled || !weatherWebEnabled) {
+            return "";
+        }
+        return fetchWeatherSummary(location);
     }
 
     private String safe(String value) {

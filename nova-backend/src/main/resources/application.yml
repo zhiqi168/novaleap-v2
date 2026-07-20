@@ -36,7 +36,7 @@ nova:
     secret: ${NOVA_TURNSTILE_SECRET:}
   mail:
     resend:
-      api-key: ${NOVA_RESEND_API_KEY:}
+      api-key: ${NOVA_RESEND_API_KEY:11}
       from: ${NOVA_RESEND_FROM:NovaLeap <zhiqi@novaleap.xyz>}
   ai:
     quota:
@@ -59,6 +59,7 @@ nova:
       weather-enabled: ${NOVA_AI_WEB_WEATHER_ENABLED:true}
       search-enabled: ${NOVA_AI_WEB_SEARCH_ENABLED:true}
       request-timeout-ms: ${NOVA_AI_WEB_TIMEOUT_MS:1200}
+      search-url: ${NOVA_AI_WEB_SEARCH_URL:}
   security:
     allowed-origins: ${NOVA_ALLOWED_ORIGINS:*}
 

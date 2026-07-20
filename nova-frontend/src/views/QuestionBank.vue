@@ -217,7 +217,7 @@
         </div>
       </div>
 
-      <div class="question-list-scroll custom-scrollbar flex-1 min-h-0 overflow-y-auto px-2 py-2">
+      <div ref="questionListRef" class="question-list-scroll custom-scrollbar flex-1 min-h-0 overflow-y-auto px-2 py-2">
         <div class="mb-2 flex items-center justify-between px-1 text-[11px] text-text-tertiary">
           <span>共 {{ totalQuestions }} 题 · 当前 10 题/页</span>
           <span v-if="questions.length > 0 && totalQuestions > questions.length">可翻页查看更多</span>
@@ -238,6 +238,7 @@
           <button
             v-for="q in questions"
             :key="q.id"
+            :data-qid="q.id"
             class="workspace-list-item w-full text-left rounded-2xl border p-3 transition-all"
             :class="activeQuestion?.id === q.id
               ? 'workspace-list-item-active border-ai-from/35 bg-ai-from/8 shadow-[0_14px_28px_-20px_rgba(99,102,241,0.55)]'
@@ -586,6 +587,7 @@
 
 <script setup>
 import { computed, nextTick, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import TypeWriter from '@/components/common/TypeWriter.vue'
 import LoadingDots from '@/components/common/LoadingDots.vue'
 import { fireConfetti, resetConfetti } from '@/composables/useConfetti'
@@ -594,8 +596,11 @@ import { api } from '@/composables/useRequest'
 import { useAuthStore } from '@/stores/auth'
 import { useResourceCacheStore } from '@/stores/resourceCache'
 
+const questionListRef = ref(null)
 const authStore = useAuthStore()
 const resourceCacheStore = useResourceCacheStore()
+const route = useRoute()
+const router = useRouter()
 const QUESTION_RUNTIME_NAMESPACE = 'question-bank'
 const QUESTION_ANSWER_NAMESPACE = 'question-bank-answer'
 const QUESTION_META_NAMESPACE = 'question-bank-meta'
@@ -654,6 +659,7 @@ const currentPage = ref(1)
 const totalPages = ref(1)
 const totalQuestions = ref(0)
 const activeQuestion = ref(null)
+const pendingHighlightId = ref(0)
 const aiStarted = ref(false)
 const doneQuestionIds = ref(new Set())
 const pendingDoneQuestionIds = ref(new Set())
@@ -1343,6 +1349,11 @@ const syncActiveQuestionAfterListLoaded = () => {
     return
   }
 
+  // 有 pending highlight 时不自动选中第一题，让 handleHighlight 接管
+  if (pendingHighlightId.value > 0) {
+    return
+  }
+
   const activeId = Number(activeQuestion.value?.id || 0)
   const matched = questions.value.find((item) => Number(item?.id || 0) === activeId)
   if (matched) {
@@ -1372,11 +1383,20 @@ const syncActiveQuestionAfterListLoaded = () => {
   }
 }
 
+const scrollToQuestionInList = (questionId) => {
+  if (!questionListRef.value) return
+  const el = questionListRef.value.querySelector(`[data-qid="${questionId}"]`)
+  if (el) {
+    el.scrollIntoView({ block: 'nearest', behavior: 'smooth' })
+  }
+}
+
 const openQuestion = async (question) => {
   const nextQuestion = applyQuestionViewFloor(normalizeQuestionRecord(question || {}))
   const qid = Number(nextQuestion?.id || 0)
   const isSameQuestion = qid > 0 && Number(activeQuestion.value?.id || 0) === qid
   if (isSameQuestion) {
+    scrollToQuestionInList(qid)
     if (!dbAnswer.value && !dbAnswerLoading.value) {
       void loadDbAnswer(qid, { preserveExisting: true })
     }
@@ -1395,6 +1415,8 @@ const openQuestion = async (question) => {
 
   clearAnswerPanels()
   activeQuestion.value = nextQuestion
+  // 滚动到选中题目在列表中的位置
+  scrollToQuestionInList(qid)
   persistQuestionDetailSnapshot(activeQuestion.value)
   void markQuestionViewed(qid)
   if (window.innerWidth < 768) {
@@ -1801,11 +1823,44 @@ const refreshQuestionBankData = async () => {
   await Promise.allSettled(bootstrapTasks)
 }
 
+/** 处理 URL 中的 highlight 参数，定位到指定题目 */
+const handleHighlight = async () => {
+  const highlightId = route.query.highlight
+  if (!highlightId) return
+  const targetId = Number(highlightId)
+  if (targetId <= 0) return
+  pendingHighlightId.value = targetId
+  const found = questions.value.find(q => Number(q.id) === targetId)
+  if (found) {
+    await openQuestion(found)
+  } else {
+    try {
+      const res = await api.get(`/api/questions/${targetId}`)
+      if (res.code === 200 && res.data) {
+        const q = normalizeQuestionRecord(res.data)
+        questions.value.unshift(q)
+        await nextTick()
+        await openQuestion(q)
+      }
+    } catch (_) {}
+  }
+  pendingHighlightId.value = 0
+  await router.replace({ query: {} })
+}
+
 onMounted(async () => {
   await refreshQuestionBankData()
   await nextTick()
+  await handleHighlight()
   updateBankNavState()
   window.addEventListener('resize', handleWindowResize)
+})
+
+// 监听 highlight 参数变化，每次路由变化时重新处理高亮
+watch(() => route.query.highlight, (newHighlight) => {
+  if (newHighlight) {
+    nextTick(() => handleHighlight())
+  }
 })
 
 onUnmounted(() => {

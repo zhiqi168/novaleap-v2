@@ -4,6 +4,10 @@ import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 
+import java.util.List;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
+
 @Service
 public class ClientRequestService {
 
@@ -25,7 +29,7 @@ public class ClientRequestService {
         if (shouldTrustForwardedHeaders(remoteAddr)) {
             for (String key : HEADER_KEYS) {
                 String value = request.getHeader(key);
-                String parsed = firstIp(value);
+                String parsed = lastNonPrivateIp(value);
                 if (isUsableIp(parsed)) {
                     return parsed;
                 }
@@ -34,15 +38,24 @@ public class ClientRequestService {
         return remoteAddr;
     }
 
-    private String firstIp(String raw) {
+    /**
+     * 取 X-Forwarded-For 中最后一个非私有 IP 地址。
+     * 在有可信反向代理的场景下，客户端真实 IP 是链中最后一个可路由的地址。
+     * 攻击者在最前面添加伪造 IP（如 X-Forwarded-For: 1.2.3.4, <real-ip>），
+     * 取末尾 IP 可避免 IP 限流和锁定被绕过。
+     */
+    private String lastNonPrivateIp(String raw) {
         if (raw == null || raw.isBlank()) {
             return "";
         }
-        String[] parts = raw.split(",");
-        if (parts.length == 0) {
+        List<String> candidates = Stream.of(raw.split(","))
+                .map(String::trim)
+                .filter(ip -> isUsableIp(ip) && !isPrivateIp(ip))
+                .collect(Collectors.toList());
+        if (candidates.isEmpty()) {
             return "";
         }
-        return parts[0].trim();
+        return candidates.get(candidates.size() - 1);
     }
 
     private boolean isUsableIp(String ip) {
@@ -56,19 +69,28 @@ public class ClientRequestService {
         return remoteAddr == null ? "" : remoteAddr;
     }
 
+    private boolean isPrivateIp(String ip) {
+        if (!isUsableIp(ip)) {
+            return true;
+        }
+        return ip.startsWith("127.")
+                || ip.startsWith("10.")
+                || ip.startsWith("192.168.")
+                || ip.startsWith("172.16.")
+                || ip.startsWith("172.17.")
+                || ip.startsWith("172.18.")
+                || ip.startsWith("172.19.")
+                || ip.startsWith("172.2")
+                || ip.startsWith("172.30.")
+                || ip.startsWith("172.31.")
+                || "::1".equals(ip)
+                || "0:0:0:0:0:0:0:1".equals(ip);
+    }
+
     private boolean shouldTrustForwardedHeaders(String remoteAddr) {
         if (!isUsableIp(remoteAddr)) {
             return false;
         }
-        return remoteAddr.startsWith("127.")
-                || remoteAddr.startsWith("10.")
-                || remoteAddr.startsWith("192.168.")
-                || remoteAddr.startsWith("172.16.")
-                || remoteAddr.startsWith("172.17.")
-                || remoteAddr.startsWith("172.18.")
-                || remoteAddr.startsWith("172.19.")
-                || remoteAddr.startsWith("172.2")
-                || remoteAddr.startsWith("172.30.")
-                || remoteAddr.startsWith("172.31.");
+        return isPrivateIp(remoteAddr);
     }
 }

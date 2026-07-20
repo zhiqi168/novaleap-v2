@@ -96,13 +96,14 @@
           </div>
         </div>
 
-        <div class="flex-1 overflow-y-auto px-2 py-2 custom-scrollbar">
+        <div ref="noteListRef" class="flex-1 overflow-y-auto px-2 py-2 custom-scrollbar">
           <div v-if="loading" class="workspace-empty p-8 text-center text-sm text-slate-500">手记加载中...</div>
           <div v-else-if="!notes.length" class="p-8 text-center text-sm text-slate-500">暂无手记内容</div>
 
           <button
             v-for="note in notes"
             :key="note.id"
+            :data-nid="note.id"
             class="workspace-list-item w-full text-left rounded-2xl mb-2 border p-3 transition-all duration-200 note-item"
             :class="activeNote?.id === note.id ? 'workspace-list-item-active border-ai-from/35 bg-ai-from/8 shadow-[0_14px_28px_-20px_rgba(99,102,241,0.55)]' : 'border-black/8 bg-white/80 hover:bg-white hover:border-black/14'"
             @click="selectNote(note)"
@@ -472,7 +473,8 @@
 </template>
 
 <script setup>
-import { computed, onMounted, onUnmounted, reactive, ref } from 'vue'
+import { computed, nextTick, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import AiSummaryBlock from '@/components/common/AiSummaryBlock.vue'
 import LoadingDots from '@/components/common/LoadingDots.vue'
 import TypeWriter from '@/components/common/TypeWriter.vue'
@@ -482,6 +484,8 @@ import { useResourceCacheStore } from '@/stores/resourceCache'
 
 const authStore = useAuthStore()
 const resourceCacheStore = useResourceCacheStore()
+const route = useRoute()
+const router = useRouter()
 const NOTE_RUNTIME_NAMESPACE = 'notes'
 const NOTE_AI_SUMMARY_NAMESPACE = 'notes-ai-summary'
 const NOTE_LIST_CACHE_TTL = 2 * 60 * 1000
@@ -494,6 +498,7 @@ const loading = ref(false)
 const noteDetailLoading = ref(false)
 const searchQuery = ref('')
 const activeNote = ref(null)
+const pendingHighlightId = ref(0)
 const aiSummaries = ref([])
 const isAiGenerating = ref(false)
 const listMode = ref('published')
@@ -546,7 +551,8 @@ const applyNotesListSnapshot = (snapshot) => {
   activeNote.value = activeId > 0
     ? notes.value.find((item) => Number(item?.id || 0) === activeId) || null
     : null
-  if (!activeNote.value && notes.value.length) {
+  // 有 pending highlight 时不自动选中第一题，让 handleNoteHighlight 接管
+  if (!activeNote.value && notes.value.length && pendingHighlightId.value === 0) {
     activeNote.value = notes.value[0]
   }
   noteDetailLoading.value = !!(activeNote.value?.id && !activeNote.value?.content)
@@ -1424,10 +1430,45 @@ const deleteNote = async (note) => {
   }
 }
 
+const noteListRef = ref(null)
+
+const scrollToNoteInList = (noteId) => {
+  if (!noteListRef.value) return
+  const el = noteListRef.value.querySelector(`[data-nid="${noteId}"]`)
+  if (el) {
+    el.scrollIntoView({ block: 'nearest', behavior: 'smooth' })
+  }
+}
+
+const handleNoteHighlight = async () => {
+  const highlightId = route.query.highlight
+  if (!highlightId) return
+  const targetId = Number(highlightId)
+  if (targetId <= 0) return
+  pendingHighlightId.value = targetId
+  const found = notes.value.find(n => Number(n.id) === targetId)
+  if (found) {
+    selectNote(found)
+    await nextTick()
+    scrollToNoteInList(targetId)
+  }
+  pendingHighlightId.value = 0
+  await router.replace({ query: {} })
+}
+
 onMounted(async () => {
   await loadCurrentNotes()
+  await nextTick()
+  await handleNoteHighlight()
   document.addEventListener('pointerdown', handleEmojiPopoverOutside, true)
   document.addEventListener('keydown', handleEmojiPopoverEscape)
+})
+
+// 监听 highlight 参数变化，每次路由变化时重新处理高亮
+watch(() => route.query.highlight, (newHighlight) => {
+  if (newHighlight) {
+    nextTick(() => handleNoteHighlight())
+  }
 })
 
 onUnmounted(() => {

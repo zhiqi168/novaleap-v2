@@ -25,6 +25,18 @@ public final class AiViewAssembler {
         vo.setTopic(toStr(row.get("topic")));
         vo.setSessionId(toStr(row.get("sessionId")));
         vo.setTimestamp(toStr(row.get("timestamp")));
+        if (row.containsKey("questions") && row.get("questions") != null) {
+            Object q = row.get("questions");
+            if (q instanceof List<?> list) {
+                vo.setQuestions((List<Object>) list);
+            }
+        }
+        if (row.containsKey("notes") && row.get("notes") != null) {
+            Object n = row.get("notes");
+            if (n instanceof List<?> list) {
+                vo.setNotes((List<Object>) list);
+            }
+        }
         return vo;
     }
 

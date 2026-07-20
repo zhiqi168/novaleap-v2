@@ -88,6 +88,39 @@
                     <div class="prose prose-sm max-w-none prose-p:leading-relaxed dark:prose-invert">
                       <TypeWriter :text="msg.content" :renderMarkdown="true" :isTyping="msg.isTyping" />
                     </div>
+
+                    <!-- 题目卡片 -->
+                    <div v-if="msg.questions && msg.questions.length > 0" class="mt-4 space-y-2">
+                      <div class="text-xs font-semibold text-text-secondary mb-1">相关题目：</div>
+                      <div
+                        v-for="q in msg.questions"
+                        :key="q.id"
+                        class="rounded-xl border border-ai-from/20 bg-white dark:bg-bg-card p-3 cursor-pointer hover:shadow-md transition-all hover:border-ai-from/40 active:scale-[0.98]"
+                        @click="goToQuestion(q.id)"
+                      >
+                        <div class="flex items-center gap-2">
+                          <span class="text-[11px] px-1.5 py-0.5 rounded-full bg-indigo-100 dark:bg-indigo-900/40 text-indigo-700 dark:text-indigo-300 font-medium">{{ q.category || '未分类' }}</span>
+                          <span class="text-[11px] px-1.5 py-0.5 rounded-full font-medium" :class="difficultyBadgeClass(q.difficulty)">
+                            {{ ['未知', '简单', '中等', '困难'][q.difficulty] || '未知' }}
+                          </span>
+                        </div>
+                        <p class="mt-1.5 text-sm font-medium text-text-primary leading-snug">{{ q.title }}</p>
+                      </div>
+                    </div>
+
+                    <!-- 笔记卡片 -->
+                    <div v-if="msg.notes && msg.notes.length > 0" class="mt-3 space-y-2">
+                      <div class="text-xs font-semibold text-text-secondary mb-1">相关笔记：</div>
+                      <div
+                        v-for="n in msg.notes"
+                        :key="n.id"
+                        class="rounded-xl border border-amber-200/60 bg-amber-50/60 dark:bg-amber-900/20 dark:border-amber-700/30 p-3 cursor-pointer hover:shadow-md transition-all hover:border-amber-300/80 active:scale-[0.98]"
+                        @click="goToNote(n.id)"
+                      >
+                        <p class="mt-0 text-sm font-medium text-text-primary leading-snug">{{ n.title }}</p>
+                        <p v-if="n.summary" class="mt-1 text-xs text-text-tertiary line-clamp-2">{{ n.summary }}</p>
+                      </div>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -146,10 +179,10 @@
 
               <button
                 class="workspace-btn workspace-btn-primary coach-send-btn text-white px-5 sm:px-6 py-2.5 rounded-xl sm:rounded-2xl font-medium transition-transform active:scale-95 flex items-center gap-2 mr-1 disabled:opacity-50 disabled:cursor-not-allowed"
-                :disabled="(!inputMessage.trim() && !uploadImage) && !isStreaming"
-                @click="isStreaming ? abort() : sendMessage()"
+                :disabled="(!inputMessage.trim() && !uploadImage) && !isBusy"
+                @click="isBusy ? abort() : sendMessage()"
               >
-                <template v-if="isStreaming">
+                <template v-if="isBusy">
                   停止生成
                 </template>
                 <template v-else>
@@ -170,7 +203,8 @@
 </template>
 
 <script setup>
-import { computed, nextTick, onMounted, ref, watch } from 'vue'
+import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
+import { useRouter } from 'vue-router'
 import TypeWriter from '@/components/common/TypeWriter.vue'
 import coachAvatarSrc from '@/assets/logo.png'
 import { useAutoPageRefresh } from '@/composables/useAutoPageRefresh'
@@ -178,6 +212,7 @@ import { useSSE } from '@/composables/useSSE'
 import { api } from '@/composables/useRequest'
 import { useAuthStore } from '@/stores/auth'
 
+const router = useRouter()
 const authStore = useAuthStore()
 const chatContainer = ref(null)
 const fileInput = ref(null)
@@ -188,11 +223,13 @@ const isRecording = ref(false)
 
 const messages = ref([buildWelcome()])
 const { content, isStreaming, error, startStream, abort, reset } = useSSE()
+const loading = ref(false)
+const isBusy = computed(() => isStreaming.value || loading.value)
 
 let recognition = null
 
 const displayAvatar = computed(() => authStore.avatar || '🥳')
-const showStarter = computed(() => messages.value.length <= 1 && !isStreaming.value)
+const showStarter = computed(() => messages.value.length <= 1 && !isBusy.value)
 const currentTopic = computed(() => '技术成长与日常聊天')
 const inputPlaceholder = computed(() => '输入你的技术问题、项目难点，或聊聊近况...(Enter 发送)')
 const quickPrompts = computed(() => [
@@ -341,38 +378,64 @@ watch(error, (err) => {
 
 const sendMessage = async () => {
   const msg = inputMessage.value.trim()
-  const hasImage = !!uploadImage.value
-  if ((!msg && !hasImage) || isStreaming.value) {
+  if ((!msg) || isBusy.value) {
     return
   }
 
   messages.value.push({
     role: 'user',
-    content: msg || '（上传了一张图片）',
-    image: uploadImage.value,
+    content: msg,
+    image: null,
   })
   inputMessage.value = ''
   await scrollToBottom()
 
   messages.value.push({
     role: 'ai',
-    content: chatMode.value === 'buddy' ? '我在看，马上回你。' : '我在分析你的问题，马上给你可执行建议。',
+    content: '让我想想...',
     isTyping: true,
+    questions: [],
+    notes: [],
   })
   await scrollToBottom()
 
-  const imageData = uploadImage.value
-  uploadImage.value = null
+  loading.value = true
+  try {
+    const res = await api.post('/api/ai/agent/chat', { message: msg })
+    const lastMsg = messages.value[messages.value.length - 1]
+    if (lastMsg?.role === 'ai' && res?.code === 200) {
+      lastMsg.content = res.data?.answer || '抱歉，没得到有效回复。'
+      lastMsg.questions = res.data?.questions || []
+      lastMsg.notes = res.data?.notes || []
+      // 保持 isTyping = true，让 TypeWriter 自动逐字显示
+      // 用户看到打字效果后，等文本全部显示完毕会自动停止光标闪烁
+    } else if (lastMsg?.role === 'ai') {
+      lastMsg.content = '请求失败，请稍后重试。'
+    }
+  } catch (e) {
+    const lastMsg = messages.value[messages.value.length - 1]
+    if (lastMsg?.role === 'ai') {
+      lastMsg.content = '请求失败，请稍后重试。'
+    }
+  }
+  loading.value = false
+  await scrollToBottom()
+  await scrollToBottom()
+}
 
-  await startStream('/api/ai/coach/chat', {
-    method: 'POST',
-    body: {
-      message: msg || '请先描述这张图片内容，再给我建议。',
-      topic: currentTopic.value,
-      image: imageData,
-      mode: chatMode.value,
-    },
-  })
+const goToQuestion = (questionId) => {
+  router.push({ name: 'QuestionBank', query: { highlight: questionId } })
+}
+
+const goToNote = (noteId) => {
+  router.push({ name: 'Notes', query: { highlight: noteId } })
+}
+
+const difficultyBadgeClass = (diff) => {
+  if (diff === 1) return 'bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300'
+  if (diff === 2) return 'bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300'
+  if (diff === 3) return 'bg-rose-100 dark:bg-rose-900/40 text-rose-700 dark:text-rose-300'
+  return 'bg-gray-100 dark:bg-gray-800 text-gray-500'
 }
 
 const loadHistory = async () => {
@@ -400,6 +463,8 @@ const loadHistory = async () => {
           content,
           image: null,
           isTyping: false,
+          questions: row.questions || [],
+          notes: row.notes || [],
         })
         continue
       }
@@ -474,6 +539,10 @@ useAutoPageRefresh(async () => {
 
 onMounted(() => {
   loadHistory()
+})
+
+onUnmounted(() => {
+  abort()
 })
 </script>
 

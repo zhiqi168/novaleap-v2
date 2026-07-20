@@ -11,7 +11,7 @@ import org.springframework.validation.annotation.Validated;
 public class AiQuotaProperties {
 
     @Min(1)
-    private long dailyTokenLimit = 10_000_000L;
+    private long dailyTokenLimit = 1000L;
 
     @DecimalMin(value = "0.0", inclusive = false)
     @DecimalMax(value = "1.0", inclusive = true)
@@ -26,7 +26,7 @@ public class AiQuotaProperties {
     private double limitRatio = 0.95D;
 
     @Min(1)
-    private long perModelTokenLimit = 5_000_000L;
+    private long perModelTokenLimit = 500L;
 
     @Min(1)
     private int modelUsageTtlDays = 2;

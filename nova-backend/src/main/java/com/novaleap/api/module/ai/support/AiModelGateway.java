@@ -11,6 +11,7 @@ import com.novaleap.api.service.AiLimitService;
 import jakarta.annotation.PreDestroy;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.chat.client.ChatClient;
+import org.springframework.ai.chat.messages.Message;
 import org.springframework.ai.chat.metadata.Usage;
 import org.springframework.ai.chat.model.ChatResponse;
 import org.springframework.ai.openai.OpenAiChatOptions;
@@ -130,11 +131,11 @@ public class AiModelGateway implements INovaLeapAiService {
         try {
             String raw = callChatRaw(request, module);
             return StringUtils.hasText(raw) ? raw.trim() : fallback;
-        } catch (Throwable e) {
+        } catch (Exception e) {
             String model = "";
             try {
                 model = resolveModel(request.getModel());
-            } catch (Throwable ignore) {
+            } catch (Exception ignore) {
                 // ignore secondary errors
             }
             aiCallAuditService.recordFailure(model, module, e.getMessage());
@@ -159,6 +160,40 @@ public class AiModelGateway implements INovaLeapAiService {
             throw runtimeException;
         } catch (Exception e) {
             throw new RuntimeException(e);
+        }
+    }
+
+    /**
+     * 非流式对话，使用预构建的消息列表（绕过 PromptTemplate，避免 { 被解析为模板占位符）。
+     * 专供 ReAct Agent 使用，复用完整的熔断/重试/配额逻辑。
+     *
+     * @param messages 预构建的消息列表（如 SystemMessage、UserMessage），不会被模板引擎处理
+     * @param module   AI 模块类型
+     * @param fallback 降级文案
+     * @return 模型回复文本，或 fallback
+     */
+    public String callChatWithMessages(List<Message> messages, AiLimitService.AiModule module, String fallback) {
+        try {
+            String targetModel = resolveModel(null);
+            return callModelWithMessagesPolicy(messages, targetModel, true, module, 0);
+        } catch (Exception e) {
+            aiCallAuditService.recordFailure(resolveModel(null), module, e.getMessage());
+            log.error("call model with messages failed", e);
+            return fallback;
+        }
+    }
+
+    /**
+     * 非流式对话，使用预构建消息列表 + 自定义 maxTokens（Agent 专用）。
+     */
+    public String callChatWithMessages(List<Message> messages, AiLimitService.AiModule module, String fallback, int maxTokensOverride) {
+        try {
+            String targetModel = resolveModel(null);
+            return callModelWithMessagesPolicy(messages, targetModel, true, module, maxTokensOverride);
+        } catch (Exception e) {
+            aiCallAuditService.recordFailure(resolveModel(null), module, e.getMessage());
+            log.error("call model with messages failed", e);
+            return fallback;
         }
     }
 
@@ -332,8 +367,86 @@ public class AiModelGateway implements INovaLeapAiService {
         });
 
         clearCircuit(model, module);
+        if (response == null || response.getResult() == null || response.getResult().getOutput() == null) {
+            log.warn("callModelExecution: empty response from model={}", model);
+            return "";
+        }
         String content = response.getResult().getOutput().getContent();
         recordModelUsage(model, module, response.getMetadata().getUsage());
+        return content == null ? "" : content.trim();
+    }
+
+    // ========== 消息列表调用（Agent 专用，绕过 PromptTemplate） ==========
+
+    /**
+     * 使用预构建消息列表的策略调用（含熔断、回退、重试逻辑）。
+     */
+    private String callModelWithMessagesPolicy(
+            List<Message> messages,
+            String model,
+            boolean allowFallback,
+            AiLimitService.AiModule module,
+            int maxTokensOverride
+    ) throws Exception {
+        String candidate = StringUtils.hasText(model) ? model : novaleapAiProperties.getModelName();
+        if (isCircuitOpen(candidate, module)) {
+            if (shouldFallback(candidate, allowFallback)) {
+                log.warn("AI circuit is open for model={}, module={}, switching to fallback={}",
+                        candidate, module, novaleapAiProperties.getFallbackModel());
+                return callModelWithMessagesPolicy(messages, novaleapAiProperties.getFallbackModel(), false, module, maxTokensOverride);
+            }
+            throw new IllegalStateException("AI circuit is open");
+        }
+
+        try {
+            return executeWithRetry(() -> callModelExecutionWithMessages(messages, candidate, module, maxTokensOverride), candidate, module);
+        } catch (Throwable throwable) {
+            Throwable actual = unwrap(throwable);
+            recordModelFailure(candidate, module, actual);
+            if (isQuotaExceededException(actual) && shouldFallback(candidate, allowFallback)) {
+                markModelQuotaExceeded(candidate);
+                return callModelWithMessagesPolicy(messages, novaleapAiProperties.getFallbackModel(), false, module, maxTokensOverride);
+            }
+            if (isRetryableException(actual) && shouldFallback(candidate, allowFallback)) {
+                return callModelWithMessagesPolicy(messages, novaleapAiProperties.getFallbackModel(), false, module, maxTokensOverride);
+            }
+            if (actual instanceof Exception exception) {
+                throw exception;
+            }
+            throw new RuntimeException(actual);
+        }
+    }
+
+    /**
+     * 使用预构建消息列表执行模型调用（绕过 PromptTemplate，避免 `{` 解析为模板占位符）。
+     */
+    private String callModelExecutionWithMessages(
+            List<Message> messages,
+            String model,
+            AiLimitService.AiModule module,
+            int maxTokensOverride
+    ) throws Exception {
+        int maxTokens = maxTokensOverride > 0 ? maxTokensOverride : calculateMaxTokens(model, aiLimitService.getCurrentDegradeLevel(), module);
+        ChatResponse response = runWithTimeout(() ->
+                chatClient.prompt()
+                        .messages(messages)
+                        .options(OpenAiChatOptions.builder()
+                                .withModel(model)
+                                .withMaxTokens(maxTokens)
+                                .build())
+                        .call()
+                        .chatResponse()
+        );
+
+        clearCircuit(model, module);
+        if (response == null || response.getResult() == null || response.getResult().getOutput() == null) {
+            log.warn("callModelExecutionWithMessages: empty response from model={}", model);
+            return "";
+        }
+        String content = response.getResult().getOutput().getContent();
+        if (response.getMetadata() != null && response.getMetadata().getUsage() != null) {
+            recordModelUsage(model, module, response.getMetadata().getUsage());
+        }
         return content == null ? "" : content.trim();
     }
 

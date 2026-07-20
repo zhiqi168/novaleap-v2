@@ -1,7 +1,12 @@
 package com.novaleap.api.service.impl;
 
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.novaleap.api.entity.Question;
+import com.novaleap.api.entity.User;
+import com.novaleap.api.entity.UserQuestionMastery;
 import com.novaleap.api.mapper.QuestionMapper;
+import com.novaleap.api.mapper.UserMapper;
+import com.novaleap.api.mapper.UserQuestionMasteryMapper;
 import com.novaleap.api.module.ai.config.NovaLeapAiProperties;
 import com.novaleap.api.module.ai.support.AiCoachSessionSupport;
 import com.novaleap.api.module.ai.support.AiExternalContextService;
@@ -19,6 +24,7 @@ import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 @Slf4j
 @Service
@@ -43,6 +49,8 @@ public class AiServiceImpl implements AiService {
     private static final int MAX_PROMPT_HISTORY = 8;
 
     private final QuestionMapper questionMapper;
+    private final UserMapper userMapper;
+    private final UserQuestionMasteryMapper userQuestionMasteryMapper;
     private final AiLimitService aiLimitService;
     private final AiCoachSessionSupport aiCoachSessionSupport;
     private final AiExternalContextService aiExternalContextService;
@@ -54,6 +62,8 @@ public class AiServiceImpl implements AiService {
 
     public AiServiceImpl(
             QuestionMapper questionMapper,
+            UserMapper userMapper,
+            UserQuestionMasteryMapper userQuestionMasteryMapper,
             AiLimitService aiLimitService,
             AiCoachSessionSupport aiCoachSessionSupport,
             AiExternalContextService aiExternalContextService,
@@ -64,6 +74,8 @@ public class AiServiceImpl implements AiService {
             NovaLeapAiProperties novaleapAiProperties
     ) {
         this.questionMapper = questionMapper;
+        this.userMapper = userMapper;
+        this.userQuestionMasteryMapper = userQuestionMasteryMapper;
         this.aiLimitService = aiLimitService;
         this.aiCoachSessionSupport = aiCoachSessionSupport;
         this.aiExternalContextService = aiExternalContextService;
@@ -155,7 +167,11 @@ public class AiServiceImpl implements AiService {
         }
         String historyText = aiCoachSessionSupport.buildHistoryPrompt(history, MAX_PROMPT_HISTORY);
         String externalContext = aiExternalContextService.buildExternalContext(cleanMessage);
-        String prompt = aiPromptFactory.buildCoachPrompt(finalMode, finalTopic, historyText, cleanMessage, image, externalContext);
+        String masteryContext = buildMasteryContext(username);
+        String combinedContext = masteryContext.isBlank()
+                ? externalContext
+                : (externalContext.isBlank() ? masteryContext : externalContext + "\n\n" + masteryContext);
+        String prompt = aiPromptFactory.buildCoachPrompt(finalMode, finalTopic, historyText, cleanMessage, image, combinedContext);
 
         aiCoachSessionSupport.saveCoachMessage(username, "user", cleanMessage, finalMode, finalTopic);
         SseEmitter stream = aiModelGateway.streamModelAnswer(
@@ -251,6 +267,67 @@ public class AiServiceImpl implements AiService {
     @Override
     public NoteModerationResult moderateNote(String title, String noteContent) {
         return aiNoteWorkflowSupport.moderateNote(title, noteContent, hasAiCapability());
+    }
+
+    /**
+     * 构建用户掌握情况上下文，注入到陪练 Prompt 中。
+     * 让旧陪练也知道用户做了哪些题、各分类掌握多少。
+     */
+    private String buildMasteryContext(String username) {
+        try {
+            if (username == null || username.isBlank()) return "";
+            LambdaQueryWrapper<User> userWrapper = new LambdaQueryWrapper<>();
+            userWrapper.eq(User::getUsername, username.trim());
+            userWrapper.last("LIMIT 1");
+            User user = userMapper.selectOne(userWrapper);
+            if (user == null) return "";
+
+            LambdaQueryWrapper<UserQuestionMastery> wrapper = new LambdaQueryWrapper<>();
+            wrapper.eq(UserQuestionMastery::getUserId, user.getId());
+            List<UserQuestionMastery> records = userQuestionMasteryMapper.selectList(wrapper);
+            if (records.isEmpty()) return "";
+
+            List<Long> questionIds = records.stream()
+                    .map(UserQuestionMastery::getQuestionId)
+                    .collect(Collectors.toList());
+            List<Question> questions = questionMapper.selectBatchIds(questionIds);
+
+            Map<Long, Question> qMap = questions.stream()
+                    .collect(Collectors.toMap(Question::getId, q -> q, (a, b) -> a));
+
+            // 按分类统计
+            Map<String, Long> catCount = records.stream()
+                    .map(r -> qMap.get(r.getQuestionId()))
+                    .filter(q -> q != null)
+                    .collect(Collectors.groupingBy(
+                            q -> q.getCategory() != null ? q.getCategory() : "未分类",
+                            Collectors.counting()
+                    ));
+
+            // 取最近 5 道题名
+            List<String> recentTitles = records.stream()
+                    .limit(5)
+                    .map(r -> {
+                        Question q = qMap.get(r.getQuestionId());
+                        return q != null ? q.getTitle() : "（ID:" + r.getQuestionId() + "）";
+                    })
+                    .collect(Collectors.toList());
+
+            StringBuilder sb = new StringBuilder("用户学习进度数据：");
+            sb.append("已掌握 ").append(records.size()).append(" 道题目。");
+            if (!recentTitles.isEmpty()) {
+                sb.append("最近完成：").append(String.join("、", recentTitles)).append("。");
+            }
+            sb.append("各分类掌握：");
+            for (Map.Entry<String, Long> entry : catCount.entrySet()) {
+                sb.append(entry.getKey()).append(" ").append(entry.getValue()).append("题、");
+            }
+            sb.append("。用户问及已做题目或推荐时，直接引用此数据。");
+            return sb.toString();
+        } catch (Exception e) {
+            log.debug("build mastery context failed: {}", e.getMessage());
+            return "";
+        }
     }
 
     private boolean hasAiCapability() {

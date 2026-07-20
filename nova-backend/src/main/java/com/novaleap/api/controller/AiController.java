@@ -1,5 +1,7 @@
 package com.novaleap.api.controller;
 
+import com.novaleap.api.module.ai.agent.ReActAgentService;
+import com.novaleap.api.module.ai.agent.dto.AgentChatRequest;
 import com.novaleap.api.common.Result;
 import com.novaleap.api.module.ai.assembler.AiViewAssembler;
 import com.novaleap.api.module.ai.dto.AiCoachChatRequest;
@@ -40,17 +42,20 @@ public class AiController {
     private final QuestionAccessSupport questionAccessSupport;
     private final CurrentUserService currentUserService;
     private final ClientRequestService clientRequestService;
+    private final ReActAgentService reactAgentService;
 
     public AiController(
             AiService aiService,
             QuestionAccessSupport questionAccessSupport,
             CurrentUserService currentUserService,
-            ClientRequestService clientRequestService
+            ClientRequestService clientRequestService,
+            ReActAgentService reactAgentService
     ) {
         this.aiService = aiService;
         this.questionAccessSupport = questionAccessSupport;
         this.currentUserService = currentUserService;
         this.clientRequestService = clientRequestService;
+        this.reactAgentService = reactAgentService;
     }
 
     @GetMapping("/question/{id}/explain")
@@ -124,6 +129,17 @@ public class AiController {
     ) {
         String identifier = resolveIdentifier(authentication, request);
         return Result.success(aiService.summarizeNote(identifier, safe(payload.getTitle()), payload.getContent()));
+    }
+
+    @PostMapping("/agent/chat")
+    public Result<ReActAgentService.AgentResult> agentChat(
+            Authentication authentication,
+            HttpServletRequest request,
+            @RequestBody @Valid AgentChatRequest payload
+    ) {
+        String identifier = resolveIdentifier(authentication, request);
+        ReActAgentService.AgentResult result = reactAgentService.execute(identifier, payload);
+        return Result.success(result);
     }
 
     private String resolveIdentifier(Authentication authentication, HttpServletRequest request) {

@@ -32,7 +32,7 @@
           @click="handleLogout"
           class="w-full flex items-center px-4 py-2 text-sm text-gray-300 hover:text-white hover:bg-white/10 rounded-md transition-colors"
         >
-          <LogOut class="w-4 h-4 mr-2" /> 退出登�?
+          <LogOut class="w-4 h-4 mr-2" /> 退出登录
         </button>
       </div>
     </aside>

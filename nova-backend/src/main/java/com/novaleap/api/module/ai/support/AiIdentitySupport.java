@@ -11,7 +11,6 @@ public class AiIdentitySupport {
 
     private static final Pattern IPV4_PATTERN = Pattern.compile("^(?:\\d{1,3}\\.){3}\\d{1,3}$");
     private static final Set<String> IDENTITY_QUESTION_HINTS = Set.of(
-            "model",
             "who are you",
             "developed by",
             "openai",

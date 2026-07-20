@@ -94,6 +94,11 @@ public class SecurityConfig {
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
+        if (allowedOrigins == null || allowedOrigins.isBlank()) {
+            throw new IllegalStateException(
+                    "NOVA_ALLOWED_ORIGINS is not configured. Set it to your frontend domain(s) in production. " +
+                    "Example: https://app.example.com,https://admin.example.com");
+        }
         List<String> origins = Arrays.stream(allowedOrigins.split(","))
                 .map(String::trim)
                 .filter(origin -> !origin.isEmpty())

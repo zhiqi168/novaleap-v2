@@ -10,6 +10,12 @@
       <div class="hero-meta">
         <span class="hero-chip">{{ greetingText }}</span>
         <span class="hero-chip">欢迎回来，{{ nickname }}</span>
+        <span v-if="showStreak" class="hero-chip hero-streak" :class="{ 'streak-done': signedToday }">
+          <span>🔥 连续</span>
+          <strong>{{ streakDays }}</strong>
+          <span>天</span>
+          <span class="streak-status">{{ signedToday ? '✓ 已签到' : '今日未签' }}</span>
+        </span>
       </div>
 
       <div class="hero-actions">
@@ -36,6 +42,11 @@
 </template>
 
 <script setup>
+import { computed } from 'vue'
+import { useAuthStore } from '@/stores/auth'
+
+const authStore = useAuthStore()
+
 defineProps({
   eyebrow: {
     type: String,
@@ -60,6 +71,15 @@ defineProps({
 })
 
 defineEmits(['primary', 'secondary'])
+
+const showStreak = computed(() => {
+  const c = authStore.user?.checkin
+  return c && typeof c.streakDays === 'number' && c.streakDays >= 0
+})
+
+const streakDays = computed(() => authStore.user?.checkin?.streakDays ?? 0)
+
+const signedToday = computed(() => !!authStore.user?.checkin?.signedToday)
 </script>
 
 <style scoped>
@@ -182,6 +202,35 @@ defineEmits(['primary', 'secondary'])
   backdrop-filter: blur(8px);
 }
 
+.hero-streak {
+  gap: 4px;
+  background: rgba(255, 241, 224, 0.88);
+  border-color: rgba(255, 181, 77, 0.28);
+  color: #b45309;
+}
+
+.hero-streak strong {
+  font-size: 18px;
+  font-weight: 800;
+  line-height: 1;
+  color: #c2410c;
+}
+
+.hero-streak .streak-status {
+  font-size: 11px;
+  opacity: 0.75;
+}
+
+.hero-streak.streak-done {
+  background: rgba(220, 252, 231, 0.88);
+  border-color: rgba(74, 222, 128, 0.28);
+  color: #15803d;
+}
+
+.hero-streak.streak-done strong {
+  color: #166534;
+}
+
 .hero-actions {
   margin-top: 36px;
   display: flex;
@@ -294,6 +343,26 @@ defineEmits(['primary', 'secondary'])
 .dark .hero-btn-secondary {
   background: var(--bg-soft);
   border-color: var(--border-soft);
+}
+
+.dark .hero-streak {
+  background: rgba(120, 53, 15, 0.25);
+  border-color: rgba(251, 191, 36, 0.18);
+  color: #fbbf24;
+}
+
+.dark .hero-streak strong {
+  color: #fcd34d;
+}
+
+.dark .hero-streak.streak-done {
+  background: rgba(22, 101, 52, 0.25);
+  border-color: rgba(74, 222, 128, 0.18);
+  color: #86efac;
+}
+
+.dark .hero-streak.streak-done strong {
+  color: #4ade80;
 }
 
 .dark .hero-title {

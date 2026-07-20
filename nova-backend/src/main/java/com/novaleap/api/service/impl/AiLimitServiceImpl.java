@@ -3,11 +3,15 @@ package com.novaleap.api.service.impl;
 import com.novaleap.api.module.quota.support.AiQuotaPolicy;
 import com.novaleap.api.module.quota.support.AiQuotaUsageSupport;
 import com.novaleap.api.service.AiLimitService;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 
 @Service
 public class AiLimitServiceImpl implements AiLimitService {
+
+    private static final Logger log = LoggerFactory.getLogger(AiLimitServiceImpl.class);
 
     private final AiQuotaPolicy aiQuotaPolicy;
     private final AiQuotaUsageSupport aiQuotaUsageSupport;
@@ -63,6 +67,11 @@ public class AiLimitServiceImpl implements AiLimitService {
 
     @Override
     public int getCurrentDegradeLevel() {
-        return aiQuotaPolicy.degradeLevel(aiQuotaUsageSupport.currentTokenUsage());
+        try {
+            return aiQuotaPolicy.degradeLevel(aiQuotaUsageSupport.currentTokenUsage());
+        } catch (Exception e) {
+            log.warn("Failed to read token usage from Redis, entering protection mode: {}", e.getMessage());
+            return 2;
+        }
     }
 }

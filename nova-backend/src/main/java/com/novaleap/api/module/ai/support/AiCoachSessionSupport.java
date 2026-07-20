@@ -104,6 +104,39 @@ public class AiCoachSessionSupport {
         }
     }
 
+    /**
+     * 保存含结构化数据的对话消息（Agent 使用，附带题目卡片和笔记卡片数据）。
+     */
+    public void saveAgentMessage(String username, String role, String content, String mode, String topic, Object questionsData, Object notesData) {
+        if (!StringUtils.hasText(username) || !StringUtils.hasText(content)) {
+            return;
+        }
+        try {
+            String sessionId = ensureActiveCoachSession(username);
+            Map<String, Object> row = new LinkedHashMap<>();
+            row.put("role", role);
+            row.put("content", content);
+            row.put("mode", mode);
+            row.put("topic", topic);
+            row.put("sessionId", sessionId);
+            row.put("timestamp", LocalDateTime.now().toString());
+            if (questionsData != null) {
+                row.put("questions", questionsData);
+            }
+            if (notesData != null) {
+                row.put("notes", notesData);
+            }
+
+            String key = historyKey(username);
+            redisTemplate.opsForList().leftPush(key, objectMapper.writeValueAsString(row));
+            redisTemplate.opsForList().trim(key, 0, MAX_HISTORY_LENGTH - 1);
+            redisTemplate.expire(key, SESSION_TTL);
+            redisTemplate.expire(activeSessionKey(username), SESSION_TTL);
+        } catch (Exception e) {
+            log.debug("save agent history failed: {}", e.getMessage());
+        }
+    }
+
     public String buildHistoryPrompt(List<Map<String, Object>> history, int maxItems) {
         if (history == null || history.isEmpty()) {
             return "";
