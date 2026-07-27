@@ -8,6 +8,7 @@ import com.novaleap.api.mapper.QuestionMapper;
 import com.novaleap.api.module.ai.agent.dto.AgentChatRequest;
 import com.novaleap.api.module.ai.support.AiCoachSessionSupport;
 import com.novaleap.api.module.ai.support.AiExternalContextService;
+import com.novaleap.api.module.ai.support.AiIdentitySupport;
 import com.novaleap.api.module.ai.support.AiModelGateway;
 import com.novaleap.api.service.AiLimitService;
 import org.slf4j.Logger;
@@ -42,6 +43,8 @@ public class ReActAgentService {
     private final QuestionMapper questionMapper;
     private final NoteMapper noteMapper;
     private final AiCoachSessionSupport coachSessionSupport;
+    private final AiLimitService aiLimitService;
+    private final AiIdentitySupport aiIdentitySupport;
 
     public ReActAgentService(
             ReActPromptFactory promptFactory,
@@ -49,7 +52,9 @@ public class ReActAgentService {
             AiExternalContextService externalContextService,
             QuestionMapper questionMapper,
             NoteMapper noteMapper,
-            AiCoachSessionSupport coachSessionSupport
+            AiCoachSessionSupport coachSessionSupport,
+            AiLimitService aiLimitService,
+            AiIdentitySupport aiIdentitySupport
     ) {
         this.promptFactory = promptFactory;
         this.aiModelGateway = aiModelGateway;
@@ -57,6 +62,8 @@ public class ReActAgentService {
         this.questionMapper = questionMapper;
         this.noteMapper = noteMapper;
         this.coachSessionSupport = coachSessionSupport;
+        this.aiLimitService = aiLimitService;
+        this.aiIdentitySupport = aiIdentitySupport;
     }
 
     /**
@@ -70,6 +77,14 @@ public class ReActAgentService {
 
         if (!StringUtils.hasText(userMessage)) {
             result.setAnswer("请输入你想交流的内容。");
+            return result;
+        }
+
+        // 检查 AI 使用配额（游客/用户次数限制）
+        String role = aiIdentitySupport.resolveRole(username);
+        AiLimitService.LimitCheckResult limit = aiLimitService.checkLimit(username, role, AiLimitService.AiModule.COACH);
+        if (!limit.isAllowed()) {
+            result.setAnswer(limit.getMessage());
             return result;
         }
 
