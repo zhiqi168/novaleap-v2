@@ -19,7 +19,9 @@ import org.springframework.ai.chat.messages.UserMessage;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -30,6 +32,7 @@ import java.util.regex.Pattern;
 public class ReActAgentService {
 
     private static final String FALLBACK_MSG = "抱歉，AI 服务暂时不可用，请稍后重试。";
+    private static final int MAX_PROMPT_HISTORY = 8;
 
     private static final Pattern ANSWER_PATTERN = Pattern.compile(
             "ANSWER:\\s*(.*)", Pattern.DOTALL
@@ -92,8 +95,16 @@ public class ReActAgentService {
         coachSessionSupport.saveCoachMessage(username, "user", userMessage, "agent", "通用技术面试");
 
         try {
-            // 1. 构建系统提示词，注入外部上下文（天气、联网搜索等）
+            // 1. 获取最近对话历史，构建上下文
+            List<Map<String, Object>> history = coachSessionSupport.getCoachHistory(username, MAX_PROMPT_HISTORY);
+            Collections.reverse(history);
+            String historyText = coachSessionSupport.buildHistoryPrompt(history, MAX_PROMPT_HISTORY);
+
+            // 2. 构建系统提示词，注入外部上下文和对话历史
             String systemPrompt = promptFactory.buildSystemPrompt();
+            if (!historyText.isBlank()) {
+                systemPrompt += "\n\n" + historyText;
+            }
             String externalContext = externalContextService.buildExternalContext(userMessage);
             if (!externalContext.isBlank()) {
                 systemPrompt += "\n\n当前实时信息：\n" + externalContext;

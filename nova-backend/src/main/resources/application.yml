@@ -36,7 +36,7 @@ nova:
     secret: ${NOVA_TURNSTILE_SECRET:}
   mail:
     resend:
-      api-key: ${NOVA_RESEND_API_KEY:11}
+      api-key: ${NOVA_RESEND_API_KEY:}
       from: ${NOVA_RESEND_FROM:NovaLeap <zhiqi@novaleap.xyz>}
   ai:
     quota:
@@ -66,7 +66,7 @@ nova:
 novaleap:
   ai:
     provider: ${NOVALEAP_AI_PROVIDER:deepseek}
-    api-key: ${NOVALEAP_AI_API_KEY:sk-2f59b6df72854b349e3f8d37b1f83c87}
+    api-key: ${NOVALEAP_AI_API_KEY:}
     base-url: ${NOVALEAP_AI_BASE_URL:https://api.deepseek.com}
     model-name: ${NOVALEAP_AI_MODEL_NAME:deepseek-v4-flash}
     fallback-model: ${NOVALEAP_AI_FALLBACK_MODEL:deepseek-v4-flash}
