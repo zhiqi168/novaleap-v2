@@ -311,7 +311,7 @@ let pdfjsModulePromise = null
 const loadPdfjs = async () => {
   if (!pdfjsModulePromise) {
     pdfjsModulePromise = import('pdfjs-dist/legacy/build/pdf.mjs').then((module) => {
-      module.GlobalWorkerOptions.workerSrc = 'https://cdn.jsdelivr.net/npm/pdfjs-dist@5.5.207/legacy/build/pdf.worker.min.mjs'
+      module.GlobalWorkerOptions.workerSrc = '/pdf.worker.min.js'
       return module
     })
   }
