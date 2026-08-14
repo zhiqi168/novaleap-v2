@@ -47,6 +47,7 @@ Thumbs.db
 # Runtime data
 mysql-data/
 redis-data/
+logs/
 
 # Local tool state
 .codex-review/

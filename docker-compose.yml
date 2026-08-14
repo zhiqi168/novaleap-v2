@@ -103,6 +103,8 @@ services:
       JAVA_TOOL_OPTIONS: ${JAVA_TOOL_OPTIONS:--Xms128m -Xmx384m -XX:+UseG1GC}
     ports:
       - "${BACKEND_BIND_IP:-127.0.0.1}:${BACKEND_PORT:-8080}:8080"
+    volumes:
+      - ./logs:/app/logs
     networks:
       - nova-net
     healthcheck:
